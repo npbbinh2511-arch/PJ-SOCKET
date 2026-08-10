@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <string_view>
-#include "hftp/common/result.hpp"
-#include "hftp/session/session.hpp"
+#include "hftp/common/result.h"
+#include "hftp/session/session.h"
 
 namespace hftp::transfer {
 

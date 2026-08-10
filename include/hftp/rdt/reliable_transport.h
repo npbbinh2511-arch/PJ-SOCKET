@@ -3,8 +3,8 @@
 #include <chrono>
 #include <span>
 #include <vector>
-#include "hftp/common/result.hpp"
-#include "hftp/transfer/transfer.hpp"
+#include "hftp/common/result.h"
+#include "hftp/transfer/transfer.h"
 
 namespace hftp::rdt {
 

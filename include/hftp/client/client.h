@@ -2,9 +2,9 @@
 
 #include <cstdint>
 #include <string_view>
-#include "hftp/common/result.hpp"
-#include "hftp/control/crlf_framer.hpp"
-#include "hftp/network/socket.hpp"
+#include "hftp/common/result.h"
+#include "hftp/control/crlf_framer.h"
+#include "hftp/network/socket.h"
 
 namespace hftp::client {
 

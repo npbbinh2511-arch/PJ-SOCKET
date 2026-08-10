@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include "hftp/common/result.hpp"
-#include "hftp/network/socket.hpp"
+#include "hftp/common/result.h"
+#include "hftp/network/socket.h"
 
 namespace hftp::server {
 
