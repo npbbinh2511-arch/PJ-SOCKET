@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(hftp STATIC
   src/network/socket.cpp
   src/protocol/reply.cpp
+  src/control/crlf_framer.cpp
+  src/control/command_parser.cpp
 )
 target_include_directories(hftp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 if(WIN32)
@@ -25,6 +27,14 @@ if(BUILD_TESTING)
   add_executable(reply_tests tests/reply_tests.cpp)
   target_link_libraries(reply_tests PRIVATE hftp)
   add_test(NAME reply_formatter COMMAND reply_tests)
+
+  add_executable(crlf_framer_tests tests/crlf_framer_tests.cpp)
+  target_link_libraries(crlf_framer_tests PRIVATE hftp)
+  add_test(NAME crlf_framer COMMAND crlf_framer_tests)
+
+  add_executable(command_parser_tests tests/command_parser_tests.cpp)
+  target_link_libraries(command_parser_tests PRIVATE hftp)
+  add_test(NAME command_parser COMMAND command_parser_tests)
 endif()
 
 add_executable(hftp_server apps/server_main.cpp)
