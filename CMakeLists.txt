@@ -22,4 +22,4 @@ add_executable(hftp_server apps/server_main.cpp)
 target_link_libraries(hftp_server PRIVATE hftp)
 
 add_executable(hftp_client apps/client_main.cpp)
-target_link_libraries(hftp_client PRIVATE hftp)
+target_link_libraries(hftp_client PRIVATE hftp) 
