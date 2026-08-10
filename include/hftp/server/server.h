@@ -3,30 +3,41 @@
 
 #include <atomic>
 #include <cstdint>
-#include <memory>
-#include <vector>
+#include <thread>
 #include "hftp/common/result.h"
 #include "hftp/network/socket.h"
+
+namespace hftp::control {
+class CommandDispatcher;
+}
 
 namespace hftp::server {
 
 class Server {
 public:
+    explicit Server(control::CommandDispatcher& dispatcher) noexcept
+        : dispatcher_(dispatcher) {}
+    ~Server();
+    Server(const Server&) = delete;
+    Server& operator=(const Server&) = delete;
+
     [[nodiscard]] common::Status start(std::uint16_t control_port);
     void request_stop() noexcept;
     void join();
-
-    // TODO(B):
-    // - Create/bind/listen on one owned TCP socket and accept until stop is requested.
-    // - Give each accepted client a fresh Session and a joinable managed worker.
-    // - Define ownership so shutdown unblocks accept/recv, joins workers, and closes once.
-    // - Bound or reap completed worker handles; never detach unmanaged threads.
-    // - Tests: bind failure, one client, two isolated clients, shutdown during recv.
+    [[nodiscard]] bool running() const noexcept { return running_.load(); }
+    [[nodiscard]] std::uint16_t control_port() const noexcept { return control_port_; }
 
 private:
+    void accept_loop();
+    void handle_client(network::Socket client);
+
     std::atomic_bool stopping_{false};
+    std::atomic_bool running_{false};
+    std::atomic_uint64_t next_session_id_{1};
     network::Socket listener_;
-    // TODO(B): choose std::jthread or a worker registry after documenting shutdown order.
+    std::jthread accept_thread_;
+    std::uint16_t control_port_{};
+    control::CommandDispatcher& dispatcher_;
 };
 
 } // namespace hftp::server

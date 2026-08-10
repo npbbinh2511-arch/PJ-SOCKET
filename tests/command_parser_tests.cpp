@@ -37,7 +37,7 @@ int main() {
     const auto preserved_argument = parser.parse("CWD   Folder With Spaces  ");
     assert(preserved_argument.ok);
     assert(preserved_argument.command.verb == "CWD");
-    assert(preserved_argument.command.argument == "  Folder With Spaces  ");
+    assert(preserved_argument.command.argument == "Folder With Spaces  ");
 
     const auto tab_separator = parser.parse("USER\talice");
     assert(tab_separator.ok);

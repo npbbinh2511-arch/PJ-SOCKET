@@ -1,6 +1,7 @@
 #ifndef HFTP_CONTROL_COMMAND_DISPATCHER_H
 #define HFTP_CONTROL_COMMAND_DISPATCHER_H
 
+#include <atomic>
 #include <string>
 #include "hftp/control/authenticator.h"
 #include "hftp/filesystem/file_repository.h"
@@ -10,6 +11,8 @@
 #include "hftp/transfer/transfer.h"
 
 namespace hftp::control {
+
+enum class DispatchAction { continue_session, close_session };
 
 class ReplySink {
 public:
@@ -24,23 +27,16 @@ public:
                       transfer::TransferCoordinator& transfers)
         : auth_(auth), files_(files), data_(data), transfers_(transfers) {}
 
-    void dispatch(const protocol::Command& command, session::Session& session, ReplySink& replies);
-
-    // TODO(B):
-    // - Normalize routing by verb, validate syntax/auth/state, and call the owning module.
-    // - Basic handlers: USER/PASS/QUIT/NOOP/TYPE/PORT-or-PASV/STOR/RETR/ABOR.
-    // - For transfers: snapshot context, transition state, emit 150, coordinate work,
-    //   then emit exactly one terminal 226/425/426/550 through serialized ReplySink.
-    // - RNFR/RNTO keeps per-session pending state; unrelated state-changing commands
-    //   define whether that state is preserved or cleared before implementation.
-    // - Never hold Session::mutex during blocking network/filesystem/transfer calls.
-    // - Tests: auth gate, bad sequence, reply order, ABOR race, session isolation.
+    [[nodiscard]] DispatchAction dispatch(const protocol::Command& command,
+                                          session::Session& session,
+                                          ReplySink& replies);
 
 private:
     Authenticator& auth_;
     filesystem::FileRepository& files_;
     transfer::DataConnectionManager& data_;
     transfer::TransferCoordinator& transfers_;
+    std::atomic_uint64_t next_transfer_id_{1};
 };
 
 } // namespace hftp::control

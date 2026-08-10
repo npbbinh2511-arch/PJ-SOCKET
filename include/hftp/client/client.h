@@ -2,7 +2,9 @@
 #define HFTP_CLIENT_CLIENT_H
 
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 #include "hftp/common/result.h"
 #include "hftp/control/crlf_framer.h"
 #include "hftp/network/socket.h"
@@ -13,15 +15,9 @@ class Client {
 public:
     [[nodiscard]] common::Status connect(std::string_view host, std::uint16_t port);
     [[nodiscard]] common::Status send_command(std::string_view command);
-    [[nodiscard]] common::Status receive_reply();
+    [[nodiscard]] common::Status receive_reply(std::vector<std::string>& replies);
     void disconnect() noexcept;
-
-    // TODO(B):
-    // - Resolve/connect with clear socket ownership and observable connection state.
-    // - send_command appends one CRLF and loops until all bytes are sent.
-    // - receive_reply feeds every recv chunk into CrlfFramer; do not assume one recv.
-    // - Handle orderly peer close, malformed/oversized reply, and socket errors.
-    // - Tests: partial send adapter, fragmented reply, coalesced replies, peer close.
+    [[nodiscard]] bool connected() const noexcept { return control_socket_.valid(); }
 
 private:
     network::Socket control_socket_;

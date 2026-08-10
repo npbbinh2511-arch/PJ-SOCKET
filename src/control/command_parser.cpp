@@ -46,7 +46,12 @@ CommandParseResult CommandParser::parse(std::string_view line) const {
 
     std::string argument;
     if (separator != std::string_view::npos) {
-        argument.assign(line.substr(separator + 1));
+        const std::size_t argument_start =
+            line.find_first_not_of(" \t", separator);
+
+        if (argument_start != std::string_view::npos) {
+            argument.assign(line.substr(argument_start));
+        }
     }
 
     return {true, {std::move(verb), std::move(argument)}, {}};
