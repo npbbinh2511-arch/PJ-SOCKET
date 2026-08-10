@@ -30,6 +30,10 @@ if(BUILD_TESTING)
   add_executable(filesystem_test tests/filesystem_test.cpp)
   target_link_libraries(filesystem_test PRIVATE hftp)
   add_test(NAME filesystem_repository COMMAND filesystem_test)
+
+  add_executable(session_test tests/session_test.cpp)
+  target_link_libraries(session_test PRIVATE hftp)
+  add_test(NAME session_management COMMAND session_test)
 endif()
 
 add_executable(hftp_server apps/server_main.cpp)
