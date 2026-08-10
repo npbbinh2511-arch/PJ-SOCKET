@@ -1,9 +1,10 @@
-#pragma once
+#ifndef HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H
+#define HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H
 
 #include <cstdint>
 #include <string_view>
-#include "hftp/common/result.hpp"
-#include "hftp/session/session.hpp"
+#include "hftp/common/result.h"
+#include "hftp/session/session.h"
 
 namespace hftp::transfer {
 
@@ -24,3 +25,5 @@ public:
 };
 
 } // namespace hftp::transfer
+
+#endif // HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H

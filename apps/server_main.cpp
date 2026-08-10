@@ -1,4 +1,4 @@
-#include "hftp/server/server.hpp"
+#include "hftp/server/server.h"
 
 int main() {
     // TODO(B): Parse a control port and server-root configuration, construct concrete

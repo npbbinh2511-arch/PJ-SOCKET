@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_SESSION_SESSION_H
+#define HFTP_SESSION_SESSION_H
 
 #include <atomic>
 #include <cstdint>
@@ -39,3 +40,4 @@ struct Session {
 
 } // namespace hftp::session
 
+#endif // HFTP_SESSION_SESSION_H

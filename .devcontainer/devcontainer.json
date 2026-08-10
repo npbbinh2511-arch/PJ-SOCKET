@@ -1,0 +1,5 @@
+{
+  "name": "Hybrid FTP C++20",
+  "image": "mcr.microsoft.com/devcontainers/cpp:1-ubuntu-24.04",
+  "postCreateCommand": "cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure"
+}

@@ -1,10 +1,11 @@
-#pragma once
+#ifndef HFTP_CLIENT_CLIENT_H
+#define HFTP_CLIENT_CLIENT_H
 
 #include <cstdint>
 #include <string_view>
-#include "hftp/common/result.hpp"
-#include "hftp/control/crlf_framer.hpp"
-#include "hftp/network/socket.hpp"
+#include "hftp/common/result.h"
+#include "hftp/control/crlf_framer.h"
+#include "hftp/network/socket.h"
 
 namespace hftp::client {
 
@@ -29,3 +30,4 @@ private:
 
 } // namespace hftp::client
 
+#endif // HFTP_CLIENT_CLIENT_H

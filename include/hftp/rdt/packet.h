@@ -1,9 +1,10 @@
-#pragma once
+#ifndef HFTP_RDT_PACKET_H
+#define HFTP_RDT_PACKET_H
 
 #include <cstdint>
 #include <span>
 #include <vector>
-#include "hftp/common/result.hpp"
+#include "hftp/common/result.h"
 
 namespace hftp::rdt {
 
@@ -34,3 +35,4 @@ public:
 
 } // namespace hftp::rdt
 
+#endif // HFTP_RDT_PACKET_H
