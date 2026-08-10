@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_CONTROL_CRLF_FRAMER_H
+#define HFTP_CONTROL_CRLF_FRAMER_H
 
 #include <cstddef>
 #include <string>
@@ -27,3 +28,4 @@ private:
 
 } // namespace hftp::control
 
+#endif // HFTP_CONTROL_CRLF_FRAMER_H

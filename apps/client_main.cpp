@@ -1,4 +1,4 @@
-#include "hftp/client/client.hpp"
+#include "hftp/client/client.h"
 
 int main() {
     // TODO(B/C): Parse server endpoint, connect Client, run a CLI command loop, and

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_COMMON_RESULT_H
+#define HFTP_COMMON_RESULT_H
 
 #include <string>
 
@@ -26,3 +27,4 @@ struct Status {
 
 } // namespace hftp::common
 
+#endif // HFTP_COMMON_RESULT_H

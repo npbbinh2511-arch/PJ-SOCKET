@@ -1,10 +1,11 @@
-#pragma once
+#ifndef HFTP_RDT_RELIABLE_TRANSPORT_H
+#define HFTP_RDT_RELIABLE_TRANSPORT_H
 
 #include <chrono>
 #include <span>
 #include <vector>
-#include "hftp/common/result.hpp"
-#include "hftp/transfer/transfer.hpp"
+#include "hftp/common/result.h"
+#include "hftp/transfer/transfer.h"
 
 namespace hftp::rdt {
 
@@ -31,3 +32,5 @@ public:
 };
 
 } // namespace hftp::rdt
+
+#endif // HFTP_RDT_RELIABLE_TRANSPORT_H

@@ -1,12 +1,13 @@
-#pragma once
+#ifndef HFTP_CONTROL_COMMAND_DISPATCHER_H
+#define HFTP_CONTROL_COMMAND_DISPATCHER_H
 
 #include <string>
-#include "hftp/control/authenticator.hpp"
-#include "hftp/filesystem/file_repository.hpp"
-#include "hftp/protocol/command.hpp"
-#include "hftp/protocol/reply.hpp"
-#include "hftp/transfer/data_connection_manager.hpp"
-#include "hftp/transfer/transfer.hpp"
+#include "hftp/control/authenticator.h"
+#include "hftp/filesystem/file_repository.h"
+#include "hftp/protocol/command.h"
+#include "hftp/protocol/reply.h"
+#include "hftp/transfer/data_connection_manager.h"
+#include "hftp/transfer/transfer.h"
 
 namespace hftp::control {
 
@@ -44,3 +45,4 @@ private:
 
 } // namespace hftp::control
 
+#endif // HFTP_CONTROL_COMMAND_DISPATCHER_H

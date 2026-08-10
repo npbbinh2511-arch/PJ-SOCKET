@@ -1,11 +1,12 @@
-#pragma once
+#ifndef HFTP_SERVER_SERVER_H
+#define HFTP_SERVER_SERVER_H
 
 #include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include "hftp/common/result.hpp"
-#include "hftp/network/socket.hpp"
+#include "hftp/common/result.h"
+#include "hftp/network/socket.h"
 
 namespace hftp::server {
 
@@ -30,3 +31,4 @@ private:
 
 } // namespace hftp::server
 
+#endif // HFTP_SERVER_SERVER_H

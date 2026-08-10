@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_PROTOCOL_COMMAND_H
+#define HFTP_PROTOCOL_COMMAND_H
 
 #include <string>
 #include <string_view>
@@ -29,3 +30,4 @@ public:
 
 } // namespace hftp::protocol
 
+#endif // HFTP_PROTOCOL_COMMAND_H
