@@ -20,6 +20,7 @@ if(WIN32)
     target_link_libraries(hftp PRIVATE ws2_32)
 endif()
 
+<<<<<<< Updated upstream
 # Applications
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/client_main.cpp")
     add_executable(hftp_client apps/client_main.cpp)
@@ -31,12 +32,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/server_main.cpp")
     target_link_libraries(hftp_server PRIVATE hftp)
 endif()
 
+=======
+>>>>>>> Stashed changes
 # Testing Configuration
 option(BUILD_TESTING "Build unit tests" ON)
 
 if(BUILD_TESTING)
     enable_testing()
 
+<<<<<<< Updated upstream
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/socket_tests.cpp")
         add_executable(socket_tests tests/socket_tests.cpp)
         target_link_libraries(socket_tests PRIVATE hftp)
@@ -86,5 +90,27 @@ if(BUILD_TESTING)
         if(TARGET rdt_tests)
             target_link_options(rdt_tests PRIVATE -static)
         endif()
+=======
+    # --- PACKET TESTS ---
+    add_executable(packet_tests tests/packet_tests.cpp)
+    target_link_libraries(packet_tests PRIVATE hftp)
+    if(WIN32)
+        target_link_libraries(packet_tests PRIVATE ws2_32)
+    endif()
+    add_test(NAME packet_wire COMMAND packet_tests)
+
+    # --- RDT TESTS ---
+    add_executable(rdt_tests tests/rdt_tests.cpp)
+    target_link_libraries(rdt_tests PRIVATE hftp)
+    if(WIN32)
+        target_link_libraries(rdt_tests PRIVATE ws2_32)
+    endif()
+    add_test(NAME rdt_loopback COMMAND rdt_tests)
+
+    # Link tĩnh hoàn toàn (Static link libgcc, libstdc++, libwinpthread)
+    if(MINGW)
+        target_link_options(packet_tests PRIVATE -static)
+        target_link_options(rdt_tests PRIVATE -static)
+>>>>>>> Stashed changes
     endif()
 endif()
