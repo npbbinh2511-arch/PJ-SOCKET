@@ -1,0 +1,44 @@
+Start testing: Aug 11 04:55 SE Asia Standard Time
+----------------------------------------------------------
+1/2 Testing: packet_wire
+1/2 Test: packet_wire
+Command: "C:/Users/Admin/.vscode/PJ-SOCKET/build/packet_tests.exe"
+Directory: C:/Users/Admin/.vscode/PJ-SOCKET/build
+"packet_wire" start time: Aug 11 04:55 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+[PASS] test_serialize_deserialize_happy_path
+[PASS] test_bad_crc
+[PASS] test_packet_too_small
+===> ALL PACKET TESTS PASSED <===
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"packet_wire" end time: Aug 11 04:55 SE Asia Standard Time
+"packet_wire" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: rdt_loopback
+2/2 Test: rdt_loopback
+Command: "C:/Users/Admin/.vscode/PJ-SOCKET/build/rdt_tests.exe"
+Directory: C:/Users/Admin/.vscode/PJ-SOCKET/build
+"rdt_loopback" start time: Aug 11 04:55 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+=== RDT ENGINE UNIT TEST STARTED ===
+[1/4] Preparing test payload...
+[2/4] Launching Receiver thread on port 54321...
+[3/4] Sender transmitting data via UDP...
+[4/4] Joining Receiver thread...
+[PASS] Loopback test transferred 50 bytes successfully!
+===> ALL RDT TESTS PASSED <===
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"rdt_loopback" end time: Aug 11 04:55 SE Asia Standard Time
+"rdt_loopback" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Aug 11 04:55 SE Asia Standard Time

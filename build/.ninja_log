@@ -1,0 +1,22 @@
+# ninja log v7
+37	682	8081019148935084	CMakeFiles/hftp.dir/src/rdt/crc32.cpp.obj	2a0c393f474c6596
+42	2035	8080869946519041	CMakeFiles/reply_tests.dir/tests/reply_tests.cpp.obj	18101906fe5a251b
+30	1408	8081019148854831	CMakeFiles/hftp.dir/src/protocol/reply.cpp.obj	9808503cbd494ac7
+46	1680	8081019149025916	CMakeFiles/hftp.dir/src/rdt/packet.cpp.obj	52e731687443e0c5
+35	6329	8080869946447046	CMakeFiles/socket_tests.dir/tests/socket_tests.cpp.obj	aa28bc06aa0d3d73
+58	6747	8080869946676251	CMakeFiles/hftp_client.dir/apps/client_main.cpp.obj	3c8cc9235a6c8095
+51	7018	8080869946625452	CMakeFiles/hftp_server.dir/apps/server_main.cpp.obj	6e37c46458405fce
+23	3895	8081019148792516	CMakeFiles/hftp.dir/src/network/socket.cpp.obj	4d8afd84780d18a8
+5400	5620	8081019202536536	libhftp.a	498fc46ca7588ac5
+4589	5015	8081014386044450	reply_tests.exe	7e679791c28a62a9
+4639	5047	8081014386607775	hftp_server.exe	e633971bcadf76db
+4579	5028	8081014385946418	socket_tests.exe	d7c4b891c98148b4
+4665	5091	8081014386835159	hftp_client.exe	586f2774a872a485
+66	1966	8081019149211332	CMakeFiles/packet_tests.dir/tests/packet_tests.cpp.obj	43225a6cbbb6f513
+5620	6165	8081019204758764	packet_tests.exe	8978209d42dfcfec
+53	5399	8081019149091691	CMakeFiles/hftp.dir/src/rdt/reliable_transport.cpp.obj	266c00e01a42d1b1
+75	5369	8081019149313869	CMakeFiles/rdt_tests.dir/tests/rdt_tests.cpp.obj	6a6b9614eacc97d5
+5638	6248	8081019204973169	rdt_tests.exe	51210503395bdd28
+25	527	8081020643359267	packet_tests.exe	edd110e491b73524
+18	5342	8081020643287208	CMakeFiles/rdt_tests.dir/tests/rdt_tests.cpp.obj	6a6b9614eacc97d5
+5343	6025	8081020696542457	rdt_tests.exe	b8a62e6394708284

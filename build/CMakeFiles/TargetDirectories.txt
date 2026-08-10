@@ -1,0 +1,6 @@
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/packet_tests.dir
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/rdt_tests.dir
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/test.dir
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/edit_cache.dir
+C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/rebuild_cache.dir

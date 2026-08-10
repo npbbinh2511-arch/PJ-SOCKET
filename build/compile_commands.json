@@ -1,0 +1,44 @@
+[
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\hftp.dir\\src\\network\\socket.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\src\\network\\socket.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/src/network/socket.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir/src/network/socket.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\hftp.dir\\src\\protocol\\reply.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\src\\protocol\\reply.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/src/protocol/reply.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir/src/protocol/reply.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\hftp.dir\\src\\rdt\\crc32.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\src\\rdt\\crc32.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/src/rdt/crc32.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir/src/rdt/crc32.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\hftp.dir\\src\\rdt\\packet.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\src\\rdt\\packet.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/src/rdt/packet.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir/src/rdt/packet.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\hftp.dir\\src\\rdt\\reliable_transport.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\src\\rdt\\reliable_transport.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/src/rdt/reliable_transport.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/hftp.dir/src/rdt/reliable_transport.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\packet_tests.dir\\tests\\packet_tests.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\tests\\packet_tests.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/tests/packet_tests.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/packet_tests.dir/tests/packet_tests.cpp.obj"
+},
+{
+  "directory": "C:/Users/Admin/.vscode/PJ-SOCKET/build",
+  "command": "C:\\mingw64\\bin\\g++.exe -IC:/Users/Admin/.vscode/PJ-SOCKET/include -g -std=gnu++20 -o CMakeFiles\\rdt_tests.dir\\tests\\rdt_tests.cpp.obj -c C:\\Users\\Admin\\.vscode\\PJ-SOCKET\\tests\\rdt_tests.cpp",
+  "file": "C:/Users/Admin/.vscode/PJ-SOCKET/tests/rdt_tests.cpp",
+  "output": "C:/Users/Admin/.vscode/PJ-SOCKET/build/CMakeFiles/rdt_tests.dir/tests/rdt_tests.cpp.obj"
+}
+]
