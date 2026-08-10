@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 using namespace hftp::filesystem;
 using namespace hftp::common;
 
-// Helper macro thay thế assert(): kiểm tra điều kiện, nếu sai sẽ báo lỗi và trả về 1
+// Helper macro thay thế assert(): kiểm tra điều kiện, nếu sai sẽ báo lỗi và trả về false
 #define TEST_CHECK(cond) \
     do { \
         if (!(cond)) { \
