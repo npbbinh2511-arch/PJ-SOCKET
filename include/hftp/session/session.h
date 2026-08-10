@@ -19,6 +19,19 @@ enum class TransferState { idle, preparing, running, cancelling };
 struct UdpEndpoint { std::string address; std::uint16_t port{}; };
 
 struct Session {
+    explicit Session(std::uint64_t session_id = 0);
+
+    Session(const Session&) = delete;
+    Session& operator=(const Session&) = delete;
+
+    void reset_authentication();
+    void reset_data_channel();
+    void clear_rename();
+    [[nodiscard]] bool prepare_transfer(std::uint64_t new_transfer_id);
+    [[nodiscard]] bool mark_transfer_running();
+    [[nodiscard]] bool request_cancellation();
+    void finish_transfer();
+
     std::uint64_t id{};
     std::string username;
     AuthState auth{AuthState::unauthenticated};

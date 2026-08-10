@@ -37,4 +37,6 @@ public:
     common::Status write_file(const std::filesystem::path& virtual_path, const std::vector<std::uint8_t>& content) const override;
 };
 
-}
+} // namespace hftp::filesystem
+
+#endif // HFTP_FILESYSTEM_FILE_REPOSITORY_H
