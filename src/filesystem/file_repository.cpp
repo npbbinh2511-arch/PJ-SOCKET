@@ -81,6 +81,7 @@ common::Status Std_FileRepository::write_file(const std::filesystem::path& path,
     temp_path += ".tmp_" + std::to_string(std::rand());
     std::ofstream file(temp_path, std::ios::binary);
 
+    
     if (!file.is_open()) {
         return common::Status{common::Error::permission_denied, "Cannot create temp file"};
     }
