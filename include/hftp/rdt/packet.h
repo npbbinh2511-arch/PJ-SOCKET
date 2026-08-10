@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_RDT_PACKET_H
+#define HFTP_RDT_PACKET_H
 
 #include <cstdint>
 #include <span>
@@ -34,3 +35,4 @@ public:
 
 } // namespace hftp::rdt
 
+#endif // HFTP_RDT_PACKET_H

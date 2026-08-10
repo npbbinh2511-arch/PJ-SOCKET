@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H
+#define HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H
 
 #include <cstdint>
 #include <string_view>
@@ -24,3 +25,5 @@ public:
 };
 
 } // namespace hftp::transfer
+
+#endif // HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H

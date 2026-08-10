@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_FILESYSTEM_FILE_REPOSITORY_H
+#define HFTP_FILESYSTEM_FILE_REPOSITORY_H
 
 #include <cstdint>
 #include <filesystem>

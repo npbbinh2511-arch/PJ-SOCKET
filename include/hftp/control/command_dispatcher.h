@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_CONTROL_COMMAND_DISPATCHER_H
+#define HFTP_CONTROL_COMMAND_DISPATCHER_H
 
 #include <string>
 #include "hftp/control/authenticator.h"
@@ -44,3 +45,4 @@ private:
 
 } // namespace hftp::control
 
+#endif // HFTP_CONTROL_COMMAND_DISPATCHER_H

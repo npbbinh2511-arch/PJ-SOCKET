@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_CONTROL_AUTHENTICATOR_H
+#define HFTP_CONTROL_AUTHENTICATOR_H
 
 #include <string_view>
 #include "hftp/common/result.h"
@@ -31,3 +32,4 @@ private:
 
 } // namespace hftp::control
 
+#endif // HFTP_CONTROL_AUTHENTICATOR_H

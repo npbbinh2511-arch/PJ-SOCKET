@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_PROTOCOL_REPLY_H
+#define HFTP_PROTOCOL_REPLY_H
 
 #include <string>
 #include <string_view>
@@ -19,13 +20,8 @@ enum class ReplyCode : int {
 class ReplyFormatter {
 public:
     [[nodiscard]] std::string format(ReplyCode code, std::string_view text) const;
-
-    // TODO(B):
-    // - Validate that text cannot inject CR/LF or forge an additional reply.
-    // - Produce exactly "ddd text\r\n" using the numeric enum value.
-    // - Keep transmission/ordering outside this pure formatter.
-    // - Tests: representative 1xx-5xx codes, empty text, CRLF injection.
 };
 
 } // namespace hftp::protocol
 
+#endif // HFTP_PROTOCOL_REPLY_H

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_CLIENT_CLIENT_H
+#define HFTP_CLIENT_CLIENT_H
 
 #include <cstdint>
 #include <string_view>
@@ -29,3 +30,4 @@ private:
 
 } // namespace hftp::client
 
+#endif // HFTP_CLIENT_CLIENT_H

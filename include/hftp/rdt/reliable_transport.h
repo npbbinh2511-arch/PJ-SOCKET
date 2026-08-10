@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_RDT_RELIABLE_TRANSPORT_H
+#define HFTP_RDT_RELIABLE_TRANSPORT_H
 
 #include <chrono>
 #include <span>
@@ -31,3 +32,5 @@ public:
 };
 
 } // namespace hftp::rdt
+
+#endif // HFTP_RDT_RELIABLE_TRANSPORT_H

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_TRANSFER_TRANSFER_H
+#define HFTP_TRANSFER_TRANSFER_H
 
 #include <atomic>
 #include <cstdint>
@@ -37,3 +38,4 @@ public:
 
 } // namespace hftp::transfer
 
+#endif // HFTP_TRANSFER_TRANSFER_H

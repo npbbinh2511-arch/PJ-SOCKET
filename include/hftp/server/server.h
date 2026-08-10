@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HFTP_SERVER_SERVER_H
+#define HFTP_SERVER_SERVER_H
 
 #include <atomic>
 #include <cstdint>
@@ -30,3 +31,4 @@ private:
 
 } // namespace hftp::server
 
+#endif // HFTP_SERVER_SERVER_H
