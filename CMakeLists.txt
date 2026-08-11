@@ -5,10 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Bổ sung src/session/session_service.cpp vào thư viện hftp
 add_library(hftp STATIC
   src/network/socket.cpp
   src/protocol/reply.cpp
+  src/protocol/command_dispatcher.cpp
   src/filesystem/file_repository.cpp
   src/session/session_service.cpp
 )
@@ -33,7 +33,6 @@ if(BUILD_TESTING)
   target_link_libraries(filesystem_test PRIVATE hftp)
   add_test(NAME filesystem_repository COMMAND filesystem_test)
 
-  # Đã đổi tên file nguồn test thành tests/session_test_1.cpp
   add_executable(session_test tests/session_test_1.cpp)
   target_link_libraries(session_test PRIVATE hftp)
   add_test(NAME session_management COMMAND session_test)
