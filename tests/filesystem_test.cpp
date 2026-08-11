@@ -19,17 +19,25 @@ using namespace hftp::common;
     } while (0)
 
 bool test_sandbox_security() {
-    fs::path test_root = fs::temp_directory_path() / "hftp_test_sandbox";
-    fs::create_directories(test_root / "subdir");
+    // 1. Tạo đường dẫn tạm duy nhất
+    fs::path test_root = fs::temp_directory_path() / "hftp_test_sandbox_security";
+    std::error_code ec;
+
+    // 2. Dọn dẹp trước khi chạy test (Setup clean environment)
+    fs::remove_all(test_root, ec);
+    fs::create_directories(test_root / "subdir", ec);
 
     Std_FileRepository repo(test_root);
     fs::path resolved;
 
+    // 3. Thực hiện các bài test kiểm tra Sandbox
     TEST_CHECK(repo.resolve_safe("/", "subdir", resolved).error == Error::none);
     TEST_CHECK(repo.resolve_safe("/", "../../../etc/passwd", resolved).error == Error::permission_denied);
     TEST_CHECK(repo.resolve_safe("/", "../hftp_test_sandbox_evil", resolved).error == Error::permission_denied);
 
-    fs::remove_all(test_root);
+    // 4. Dọn dẹp sau khi test xong (Teardown)
+    fs::remove_all(test_root, ec);
+
     std::cout << "[PASS] Test Sandbox Security successfully!\n";
     return true;
 }
