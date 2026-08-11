@@ -240,6 +240,38 @@ std::string CommandDispatcher::dispatch(session::Session& session, const Command
 
         return m_formatter.format(ReplyCode::file_action_ok, "File action successful.");
     }
+
+    // 11. Lệnh TYPE <A|I>
+    if (cmd.verb == "TYPE") {
+        if (cmd.argument == "A" || cmd.argument == "a") {
+            return m_formatter.format(ReplyCode::ok, "Type set to A.");
+        }
+        if (cmd.argument == "I" || cmd.argument == "i" || cmd.argument == "L 8") {
+            return m_formatter.format(ReplyCode::ok, "Type set to I.");
+        }
+        return m_formatter.format(ReplyCode::parameter_error, "Type not supported. Use A or I.");
+    }
+
+    // 12. Lệnh MODE <S>
+    if (cmd.verb == "MODE") {
+        if (cmd.argument == "S" || cmd.argument == "s") {
+            return m_formatter.format(ReplyCode::ok, "Mode set to S.");
+        }
+        return m_formatter.format(ReplyCode::parameter_error, "Only Stream mode (S) is supported.");
+    }
+
+    // 13. Lệnh STRU <F>
+    if (cmd.verb == "STRU") {
+        if (cmd.argument == "F" || cmd.argument == "f") {
+            return m_formatter.format(ReplyCode::ok, "Structure set to F.");
+        }
+        return m_formatter.format(ReplyCode::parameter_error, "Only File structure (F) is supported.");
+    }
+
+    // 14. Lệnh NOOP
+    if (cmd.verb == "NOOP") {
+        return m_formatter.format(ReplyCode::ok, "OK.");
+    }
 }
 
 } // namespace hftp::protocol

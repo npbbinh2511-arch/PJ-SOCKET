@@ -194,6 +194,39 @@ bool test_rnfr_rnto_commands() {
   return true;
 }
 
+bool test_config_commands() {
+  fs::path test_root = fs::temp_directory_path() / "hftp_test_config";
+  std::error_code ec;
+  fs::create_directories(test_root, ec);
+
+  Std_FileRepository repo(test_root);
+  SessionService service(repo);
+  CommandDispatcher dispatcher(service);
+  Session session;
+
+  // 1. Test TYPE
+  Command type_a{"TYPE", "A"};
+  TEST_CHECK(dispatcher.dispatch(session, type_a).rfind("200", 0) == 0);
+
+  Command type_i{"TYPE", "I"};
+  TEST_CHECK(dispatcher.dispatch(session, type_i).rfind("200", 0) == 0);
+
+  // 2. Test MODE & STRU
+  Command mode_s{"MODE", "S"};
+  TEST_CHECK(dispatcher.dispatch(session, mode_s).rfind("200", 0) == 0);
+
+  Command stru_f{"STRU", "F"};
+  TEST_CHECK(dispatcher.dispatch(session, stru_f).rfind("200", 0) == 0);
+
+  // 3. Test NOOP
+  Command noop{"NOOP", ""};
+  TEST_CHECK(dispatcher.dispatch(session, noop).rfind("200", 0) == 0);
+
+  fs::remove_all(test_root, ec);
+  std::cout << "[PASS] Test TYPE, MODE, STRU, NOOP commands successfully!\n";
+  return true;
+}
+
 int main() {
   if (!test_session_cwd_and_sandbox()) return 1;
   if (!test_command_dispatcher_integration()) return 1;
