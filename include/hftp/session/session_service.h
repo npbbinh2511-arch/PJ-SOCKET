@@ -23,6 +23,8 @@ public:
 
     // Xử lý lệnh CDUP: Chuyển về thư mục cha ("..")
     common::Status change_to_parent_directory(Session& session) const;
+
+    common::Status resolve_path(const Session& session, const std::filesystem::path& requested_path, std::filesystem::path& out_physical_path) const;
 };
 
 } // namespace hftp::session

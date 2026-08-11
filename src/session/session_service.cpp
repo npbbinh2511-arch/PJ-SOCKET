@@ -48,4 +48,13 @@ common::Status SessionService::change_to_parent_directory(Session& session) cons
     return change_directory(session, "..");
 }
 
+common::Status SessionService::resolve_path(const Session& session, const std::filesystem::path& requested_path, std::filesystem::path& out_physical_path) const {
+    std::filesystem::path current_cwd;
+    {
+        std::lock_guard<std::mutex> lock(session.mutex);
+        current_cwd = session.current_directory;
+    }
+    return m_repo.resolve_safe(current_cwd, requested_path, out_physical_path);
+}
+
 } // namespace hftp::session
