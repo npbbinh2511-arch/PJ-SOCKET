@@ -2,6 +2,7 @@
 #define HFTP_RDT_RELIABLE_TRANSPORT_H
 
 #include <chrono>
+#include <memory>
 #include <span>
 #include <vector>
 #include "hftp/common/result.h"
@@ -30,6 +31,9 @@ public:
     // - Tests: happy path, lost ACK, duplicate data, corruption, cancellation.
     // TODO(A) Excellent: add a separate window strategy; do not change this contract.
 };
+
+std::unique_ptr<ReliableTransport> create_stop_and_wait_transport(
+    StopAndWaitOptions options = {});
 
 } // namespace hftp::rdt
 
