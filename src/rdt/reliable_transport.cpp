@@ -1,3 +1,7 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "hftp/rdt/reliable_transport.h"
 #include "hftp/rdt/packet.h"
 #include "hftp/rdt/crc32.h"
