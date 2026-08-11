@@ -97,7 +97,7 @@ public:
         std::vector<std::vector<std::byte>> chunks;
         std::size_t offset = 0;
         while (offset < total_size || chunks.empty()) {
-            std::size_t chunk_size = std::min(payload_size, total_size - offset);
+            std::size_t chunk_size = (std::min)(payload_size, total_size - offset);
             std::vector<std::byte> chunk(data.begin() + offset, data.begin() + offset + chunk_size);
             chunks.push_back(chunk);
             offset += chunk_size;
