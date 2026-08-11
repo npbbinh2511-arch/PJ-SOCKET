@@ -13,6 +13,8 @@
 #include <cstring>
 #include <random>
 #include <iostream>
+#include <cstddef>  // Bắt buộc cho std::byte
+#include <span>     // Bắt buộc cho std::span
 #include <vector>
 
 #ifdef _WIN32
