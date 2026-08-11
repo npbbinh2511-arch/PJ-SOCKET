@@ -14,6 +14,8 @@ struct StopAndWaitOptions {
     std::chrono::milliseconds timeout{500};
     std::uint32_t max_retries{8};
     std::size_t payload_size{1200};
+    double drop_probability{0.0};
+    std::size_t window_size{4}; // Cửa sổ trượt cho Go-Back-N (Default: 4)
 };
 
 class ReliableTransport {
