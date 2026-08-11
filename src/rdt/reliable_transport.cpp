@@ -47,11 +47,11 @@ void set_socket_timeout(network::NativeSocket sock, std::chrono::milliseconds ti
     struct timeval tv;
     tv.tv_sec = static_cast<long>(timeout.count() / 1000);
     tv.tv_usec = static_cast<long>((timeout.count() % 1000) * 1000);
-    ::setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    ::setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
 #endif
 }
 
-// --- BẪY RỚT MẠNG: Hàm đổ xúc xắc ---
+// --- BẪY RỚT MẠNG: Hàm giả lập rớt gói ---
 bool should_drop_packet(double probability) {
     if (probability <= 0.0) return false;
     static std::mt19937 rng(std::random_device{}());
@@ -133,9 +133,7 @@ public:
                     return st;
                 }
 
-                if (should_drop_packet(m_options.drop_probability)) {
-                    // "[SIMULATE] Co tinh lam rot goi tin Window seq=" << next_seq << "\n";
-                } else {
+                if (!should_drop_packet(m_options.drop_probability)) {
                     ::sendto(
                         sock, 
                         reinterpret_cast<const char*>(wire_bytes.data()), 
@@ -222,6 +220,10 @@ public:
         if (sock == network::invalid_socket) {
             return {common::Error::socket_error, "Failed to create UDP socket"};
         }
+
+        // Tái sử dụng địa chỉ Socket để tránh dính Port trên Windows CI Runner
+        int reuse = 1;
+        ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
         set_socket_timeout(sock, m_options.timeout);
 
