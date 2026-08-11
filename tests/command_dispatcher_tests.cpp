@@ -20,6 +20,7 @@ using hftp::control::CredentialStore;
 using hftp::control::DispatchAction;
 using hftp::control::ReplySink;
 using hftp::filesystem::Entry;
+using hftp::filesystem::FileMetadata;
 using hftp::filesystem::FileRepository;
 using hftp::protocol::Command;
 using hftp::protocol::ReplyCode;
@@ -59,6 +60,34 @@ public:
     }
     Status write_file(const std::filesystem::path&,
                       const std::vector<std::uint8_t>&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status append_file(const std::filesystem::path&,
+                       const std::vector<std::uint8_t>&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status write_unique(const std::filesystem::path&,
+                        const std::vector<std::uint8_t>&,
+                        std::filesystem::path&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status metadata(const std::filesystem::path&, FileMetadata&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status make_directory(const std::filesystem::path&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status remove_directory(const std::filesystem::path&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status remove_file(const std::filesystem::path&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status rename_entry(const std::filesystem::path&,
+                        const std::filesystem::path&) const override {
+        return {Error::not_found, "Not used"};
+    }
+    Status sha256_file(const std::filesystem::path&, std::string&) const override {
         return {Error::not_found, "Not used"};
     }
 };
@@ -132,6 +161,7 @@ public:
 };
 
 void login(CommandDispatcher& dispatcher, Session& session, Replies& replies) {
+    session.control_peer_address = "127.0.0.1";
     assert(dispatcher.dispatch(Command{"USER", "alice"}, session, replies) ==
            DispatchAction::continue_session);
     assert(replies.values.back().first == ReplyCode::need_password);
@@ -168,6 +198,7 @@ int main() {
 
     assert(dispatcher.dispatch(Command{"STOR", "file.txt"}, session, replies) ==
            DispatchAction::continue_session);
+    dispatcher.end_session(session);
     assert(replies.contains(ReplyCode::opening_data));
     assert(replies.values.back().first == ReplyCode::transfer_complete);
     assert(coordinator.contexts.size() == 1);
@@ -215,15 +246,43 @@ int main() {
     });
     blocking.wait_until_started();
     assert(cancellable_dispatcher.dispatch(
+               Command{"PASV", ""}, cancellable_session,
+               cancellation_replies) == DispatchAction::continue_session);
+    assert(cancellation_replies.values.back().first == ReplyCode::bad_sequence);
+
+    std::size_t abor_reply_start = 0;
+    {
+        const std::scoped_lock lock(cancellation_replies.mutex);
+        abor_reply_start = cancellation_replies.values.size();
+    }
+    assert(cancellable_dispatcher.dispatch(
                Command{"ABOR", ""}, cancellable_session, cancellation_replies) ==
            DispatchAction::continue_session);
     transfer_thread.join();
+    cancellable_dispatcher.end_session(cancellable_session);
 
     assert(blocking.active_transfer_id != 0);
     assert(blocking.cancelled_transfer_id == blocking.active_transfer_id);
     assert(cancellation_replies.contains(ReplyCode::opening_data));
     assert(cancellation_replies.contains(ReplyCode::ok));
     assert(cancellation_replies.contains(ReplyCode::transfer_aborted));
+    {
+        const std::scoped_lock lock(cancellation_replies.mutex);
+        const auto begin = cancellation_replies.values.begin() +
+                           static_cast<std::ptrdiff_t>(abor_reply_start);
+        const auto abort_ack = std::find_if(
+            begin, cancellation_replies.values.end(), [](const auto& reply) {
+                return reply.first == ReplyCode::ok &&
+                       reply.second == "Abort requested";
+            });
+        const auto terminal = std::find_if(
+            begin, cancellation_replies.values.end(), [](const auto& reply) {
+                return reply.first == ReplyCode::transfer_aborted;
+            });
+        assert(abort_ack != cancellation_replies.values.end());
+        assert(terminal != cancellation_replies.values.end());
+        assert(abort_ack < terminal);
+    }
     assert(cancellable_session.transfer == hftp::session::TransferState::idle);
     assert(cancellable_session.data_mode == DataMode::none);
 }

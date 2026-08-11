@@ -83,6 +83,18 @@ common::Status DataConnectionManager::set_active(session::Session& session,
     }
 
     const std::scoped_lock lock(mutex_, session.mutex);
+    if (session.transfer != session::TransferState::idle) {
+        return {common::Error::busy,
+                "Cannot change data mode during a transfer"};
+    }
+    if (session.control_peer_address.empty()) {
+        return {common::Error::permission_denied,
+                "Control peer address is unavailable"};
+    }
+    if (parsed.endpoint.address != session.control_peer_address) {
+        return {common::Error::permission_denied,
+                "PORT address must match the TCP control peer"};
+    }
     passive_sockets_.erase(session.id);
     session.passive_port.reset();
     session.active_endpoint = std::move(parsed.endpoint);
@@ -95,8 +107,31 @@ common::Status DataConnectionManager::open_passive(session::Session& session) {
         return {common::Error::invalid_argument, "Passive mode requires a valid session ID"};
     }
 
-    network::Socket socket(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-    if (!socket.valid()) {
+    in_addr advertised{};
+    if (::inet_pton(AF_INET, passive_address_.c_str(), &advertised) != 1) {
+        return {common::Error::invalid_argument,
+                "Passive address must be a valid IPv4 address"};
+    }
+    const std::uint32_t advertised_host = ntohl(advertised.s_addr);
+    const std::uint8_t first_octet = static_cast<std::uint8_t>(
+        advertised_host >> 24U);
+    if (advertised_host == INADDR_ANY || advertised_host == INADDR_BROADCAST ||
+        (first_octet >= 224U && first_octet <= 239U)) {
+        return {common::Error::invalid_argument,
+                "Passive address is not usable"};
+    }
+
+    {
+        const std::scoped_lock lock(session.mutex);
+        if (session.transfer != session::TransferState::idle) {
+            return {common::Error::busy,
+                    "Cannot change data mode during a transfer"};
+        }
+    }
+
+    auto socket = std::make_shared<network::Socket>(
+        ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+    if (!socket->valid()) {
         return socket_failure("Unable to create passive UDP socket");
     }
 
@@ -104,7 +139,7 @@ common::Status DataConnectionManager::open_passive(session::Session& session) {
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
     address.sin_port = 0;
-    if (::bind(socket.native_handle(), reinterpret_cast<sockaddr*>(&address),
+    if (::bind(socket->native_handle(), reinterpret_cast<sockaddr*>(&address),
                static_cast<int>(sizeof(address))) != 0) {
         return socket_failure("Unable to bind passive UDP socket");
     }
@@ -114,7 +149,7 @@ common::Status DataConnectionManager::open_passive(session::Session& session) {
 #else
     socklen_t address_length = sizeof(address);
 #endif
-    if (::getsockname(socket.native_handle(), reinterpret_cast<sockaddr*>(&address),
+    if (::getsockname(socket->native_handle(), reinterpret_cast<sockaddr*>(&address),
                       &address_length) != 0) {
         return socket_failure("Unable to read passive UDP endpoint");
     }
@@ -136,12 +171,11 @@ void DataConnectionManager::reset(session::Session& session) noexcept {
     session.data_mode = session::DataMode::none;
 }
 
-network::NativeSocket DataConnectionManager::passive_socket(std::uint64_t session_id) const noexcept {
+std::shared_ptr<network::Socket> DataConnectionManager::acquire_passive_socket(
+    std::uint64_t session_id) const noexcept {
     const std::scoped_lock lock(mutex_);
     const auto found = passive_sockets_.find(session_id);
-    return found == passive_sockets_.end()
-               ? network::invalid_socket
-               : found->second.native_handle();
+    return found == passive_sockets_.end() ? nullptr : found->second;
 }
 
 } // namespace hftp::transfer

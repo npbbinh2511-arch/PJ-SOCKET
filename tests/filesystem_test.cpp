@@ -99,6 +99,12 @@ bool test_sandbox_security() {
     TEST_CHECK(repository.resolve_safe("/parent", "../../outside", resolved).error == Error::permission_denied);
     TEST_CHECK(resolved.empty());
 
+    const std::string embedded_nul("parent\0hidden", 13);
+    TEST_CHECK(repository.resolve_safe("/", embedded_nul, resolved).error ==
+               Error::invalid_argument);
+    TEST_CHECK(repository.resolve_safe("/", "forged\r\nname", resolved).error ==
+               Error::invalid_argument);
+
 #if defined(_WIN32)
     TEST_CHECK(repository.resolve_safe("/", fs::temp_directory_path(), resolved).error == Error::permission_denied);
 #endif

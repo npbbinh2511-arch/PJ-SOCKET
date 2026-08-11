@@ -2,6 +2,7 @@
 #define HFTP_TRANSFER_DATA_CONNECTION_MANAGER_H
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -25,12 +26,13 @@ public:
                                             std::string_view argument);
     [[nodiscard]] common::Status open_passive(session::Session& session);
     void reset(session::Session& session) noexcept;
-    [[nodiscard]] network::NativeSocket passive_socket(std::uint64_t session_id) const noexcept;
+    [[nodiscard]] std::shared_ptr<network::Socket> acquire_passive_socket(
+        std::uint64_t session_id) const noexcept;
     [[nodiscard]] const std::string& passive_address() const noexcept { return passive_address_; }
 
 private:
     mutable std::mutex mutex_;
-    std::unordered_map<std::uint64_t, network::Socket> passive_sockets_;
+    std::unordered_map<std::uint64_t, std::shared_ptr<network::Socket>> passive_sockets_;
     std::string passive_address_;
 };
 

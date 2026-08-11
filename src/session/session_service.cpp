@@ -1,32 +1,63 @@
-#ifndef HFTP_SESSION_SESSION_SERVICE_H
-#define HFTP_SESSION_SESSION_SERVICE_H
+#include "hftp/session/session_service.h"
 
-#include <filesystem>
-#include "hftp/common/result.h"
-#include "hftp/filesystem/file_repository.h"
-#include "hftp/session/session.h"
+#include <mutex>
+#include <system_error>
 
 namespace hftp::session {
 
-class SessionService {
-private:
-    const filesystem::FileRepository& m_repo;
+SessionService::SessionService(const filesystem::FileRepository& repository)
+    : m_repo(repository) {}
 
-public:
-    explicit SessionService(const filesystem::FileRepository& repo);
+std::filesystem::path SessionService::get_pwd(const Session& session) const {
+    const std::scoped_lock lock(session.mutex);
+    return session.current_directory;
+}
 
-    // Xử lý lệnh PWD: Trả về virtual path hiện tại
-    [[nodiscard]] std::filesystem::path get_pwd(const Session& session) const;
+common::Status SessionService::change_directory(
+    Session& session, const std::filesystem::path& requested_path) const {
+    std::filesystem::path current_directory;
+    {
+        const std::scoped_lock lock(session.mutex);
+        current_directory = session.current_directory;
+    }
 
-    // Xử lý lệnh CWD: Kiểm tra sandbox & thư mục tồn tại trước khi đổi
-    common::Status change_directory(Session& session, const std::filesystem::path& requested_path) const;
+    std::filesystem::path physical_path;
+    const auto resolve_status =
+        m_repo.resolve_safe(current_directory, requested_path, physical_path);
+    if (!resolve_status) {
+        return resolve_status;
+    }
+    std::error_code error;
+    if (!std::filesystem::is_directory(physical_path, error) || error) {
+        return {common::Error::not_found, "Directory not found or inaccessible"};
+    }
 
-    // Xử lý lệnh CDUP: Chuyển về thư mục cha ("..")
-    common::Status change_to_parent_directory(Session& session) const;
+    std::filesystem::path virtual_path;
+    const auto normalize_status = filesystem::normalize_virtual_path(
+        current_directory, requested_path, virtual_path);
+    if (!normalize_status) {
+        return normalize_status;
+    }
+    {
+        const std::scoped_lock lock(session.mutex);
+        session.current_directory = std::move(virtual_path);
+    }
+    return {};
+}
 
-    common::Status resolve_path(const Session& session, const std::filesystem::path& requested_path, std::filesystem::path& out_physical_path) const;
-};
+common::Status SessionService::change_to_parent_directory(Session& session) const {
+    return change_directory(session, "..");
+}
+
+common::Status SessionService::resolve_path(
+    const Session& session, const std::filesystem::path& requested_path,
+    std::filesystem::path& out_physical_path) const {
+    std::filesystem::path current_directory;
+    {
+        const std::scoped_lock lock(session.mutex);
+        current_directory = session.current_directory;
+    }
+    return m_repo.resolve_safe(current_directory, requested_path, out_physical_path);
+}
 
 } // namespace hftp::session
-
-#endif // HFTP_SESSION_SESSION_SERVICE_H    

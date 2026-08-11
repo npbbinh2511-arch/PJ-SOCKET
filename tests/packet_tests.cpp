@@ -69,10 +69,55 @@ void test_packet_too_small() {
     std::cout << "[PASS] test_packet_too_small\n";
 }
 
+void test_serialize_rejects_malformed_without_changing_output() {
+    PacketWire wire;
+    Packet packet;
+    packet.transfer_id = 7;
+    packet.flags = PacketFlag::ack;
+    packet.payload.push_back(std::byte{'X'});
+
+    const std::vector<std::byte> original{std::byte{0x11}, std::byte{0x22}};
+    auto output = original;
+    const auto status = wire.serialize(packet, output);
+    assert(status.error == hftp::common::Error::invalid_argument);
+    assert(output == original);
+
+    packet.flags = PacketFlag::data;
+    packet.payload.assign(65536, std::byte{0});
+    output = original;
+    const auto oversized = wire.serialize(packet, output);
+    assert(oversized.error == hftp::common::Error::invalid_argument);
+    assert(output == original);
+
+    std::cout << "[PASS] test_serialize_rejects_malformed_without_changing_output\n";
+}
+
+void test_header_corruption_is_detected_and_output_is_unchanged() {
+    PacketWire wire;
+    Packet source;
+    source.transfer_id = 9;
+    source.sequence = 3;
+    source.payload = {std::byte{'A'}, std::byte{'B'}};
+
+    std::vector<std::byte> encoded;
+    assert(wire.serialize(source, encoded));
+    encoded[9] ^= std::byte{0x01};
+
+    Packet destination;
+    destination.transfer_id = 1234;
+    const auto status = wire.deserialize(encoded, destination);
+    assert(status.error == hftp::common::Error::integrity_error);
+    assert(destination.transfer_id == 1234);
+
+    std::cout << "[PASS] test_header_corruption_is_detected_and_output_is_unchanged\n";
+}
+
 int main() {
     test_serialize_deserialize_happy_path();
     test_bad_crc();
     test_packet_too_small();
+    test_serialize_rejects_malformed_without_changing_output();
+    test_header_corruption_is_detected_and_output_is_unchanged();
     std::cout << "===> ALL PACKET TESTS PASSED <===\n";
     return 0;
 }

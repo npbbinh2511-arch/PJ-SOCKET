@@ -1,263 +1,106 @@
+#include "hftp/control/command_dispatcher.h"
+#include "hftp/filesystem/file_repository.h"
+#include "hftp/network/socket.h"
+
+#include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "hftp/filesystem/file_repository.h"
-#include "hftp/protocol/command_dispatcher.h"
-#include "hftp/session/session.h"
-#include "hftp/session/session_service.h"
+namespace {
 
-namespace fs = std::filesystem;
-using namespace hftp::filesystem;
-using namespace hftp::session;
-using namespace hftp::common;
-using namespace hftp::protocol;
+class Credentials final : public hftp::control::CredentialStore {
+public:
+    bool verify(std::string_view username,
+                std::string_view password) const override {
+        return username == "alice" && password == "secret";
+    }
+};
 
-#define TEST_CHECK(cond)                                                       \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      std::cerr << "  [FAIL] " << __FILE__ << ":" << __LINE__                  \
-                << " -> Condition failed: " #cond << "\n";                     \
-      return false;                                                            \
-    }                                                                          \
-  } while (0)
+class Transfers final : public hftp::transfer::TransferCoordinator {
+public:
+    hftp::common::Status start(
+        const hftp::transfer::TransferContext&) override {
+        return {};
+    }
+    void request_cancel(std::uint64_t) override {}
+};
 
-// 1. Test CWD & Sandbox
-bool test_session_cwd_and_sandbox() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_session";
-  std::error_code ec;
-  fs::remove_all(test_root, ec);
-  fs::create_directories(test_root / "docs", ec);
-  fs::create_directories(test_root / "downloads", ec);
+class Replies final : public hftp::control::ReplySink {
+public:
+    void send(hftp::protocol::ReplyCode code, std::string text) override {
+        values.emplace_back(code, std::move(text));
+    }
 
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  Session session;
-  session.id = 1;
+    std::vector<std::pair<hftp::protocol::ReplyCode, std::string>> values;
+};
 
-  TEST_CHECK(service.get_pwd(session) == "/");
-  TEST_CHECK(service.change_directory(session, "docs").error == Error::none);
-  TEST_CHECK(service.get_pwd(session) == "/docs");
-  TEST_CHECK(service.change_directory(session, "..").error == Error::none);
-  TEST_CHECK(service.get_pwd(session) == "/");
-  TEST_CHECK(service.change_directory(session, "../../etc").error ==
-             Error::permission_denied);
-  TEST_CHECK(service.get_pwd(session) == "/");
-  TEST_CHECK(service.change_directory(session, "non_existent_folder").error ==
-             Error::not_found);
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test Session CWD & Sandbox Security successfully!\n";
-  return true;
+void expect(hftp::control::CommandDispatcher& dispatcher,
+            hftp::session::Session& session,
+            Replies& replies,
+            std::string verb,
+            std::string argument,
+            hftp::protocol::ReplyCode expected) {
+    const auto action = dispatcher.dispatch(
+        {std::move(verb), std::move(argument)}, session, replies);
+    assert(action == hftp::control::DispatchAction::continue_session);
+    assert(!replies.values.empty());
+    assert(replies.values.back().first == expected);
 }
 
-// 2. Test PWD, CWD, CDUP Dispatcher Integration
-bool test_command_dispatcher_integration() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_dispatcher_test";
-  std::error_code ec;
-  fs::remove_all(test_root, ec);
-  fs::create_directories(test_root / "subdir", ec);
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  Command pwd_cmd{"PWD", ""};
-  std::string res_pwd = dispatcher.dispatch(session, pwd_cmd);
-  TEST_CHECK(res_pwd.rfind("257", 0) == 0);
-
-  Command cwd_cmd{"CWD", "subdir"};
-  std::string res_cwd = dispatcher.dispatch(session, cwd_cmd);
-  TEST_CHECK(res_cwd.rfind("250", 0) == 0);
-
-  Command cdup_cmd{"CDUP", ""};
-  std::string res_cdup = dispatcher.dispatch(session, cdup_cmd);
-  TEST_CHECK(res_cdup.rfind("200", 0) == 0 || res_cdup.rfind("250", 0) == 0);
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test Command Dispatcher Integration successfully!\n";
-  return true;
-}
-
-// 3. Test SIZE & MDTM Commands
-bool test_size_and_mdtm_commands() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_size_mdtm";
-  std::error_code ec;
-  fs::remove_all(test_root, ec);
-  fs::create_directories(test_root, ec);
-
-  fs::path sample_file = test_root / "test.txt";
-  {
-    std::ofstream ofs(sample_file);
-    ofs << "Hello World!";
-  }
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  Command size_cmd{"SIZE", "test.txt"};
-  std::string res_size = dispatcher.dispatch(session, size_cmd);
-  TEST_CHECK(res_size.rfind("213 12", 0) == 0);
-
-  Command size_invalid{"SIZE", "not_exist.txt"};
-  std::string res_invalid_size = dispatcher.dispatch(session, size_invalid);
-  TEST_CHECK(res_invalid_size.rfind("550", 0) == 0);
-
-  Command mdtm_cmd{"MDTM", "test.txt"};
-  std::string res_mdtm = dispatcher.dispatch(session, mdtm_cmd);
-  TEST_CHECK(res_mdtm.rfind("213 ", 0) == 0);
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test SIZE and MDTM commands successfully!\n";
-  return true;
-}
-
-// 4. Test MKD, RMD, DELE Commands
-bool test_mkd_rmd_dele_commands() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_mkd_rmd_dele";
-  std::error_code ec;
-  fs::remove_all(test_root, ec);
-  fs::create_directories(test_root, ec);
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  Command mkd_cmd{"MKD", "new_folder"};
-  std::string res_mkd = dispatcher.dispatch(session, mkd_cmd);
-  TEST_CHECK(res_mkd.rfind("257", 0) == 0);
-  TEST_CHECK(fs::is_directory(test_root / "new_folder"));
-
-  fs::path temp_file = test_root / "delete_me.txt";
-  {
-    std::ofstream ofs(temp_file);
-    ofs << "bye";
-  }
-  Command dele_cmd{"DELE", "delete_me.txt"};
-  std::string res_dele = dispatcher.dispatch(session, dele_cmd);
-  TEST_CHECK(res_dele.rfind("250", 0) == 0);
-  TEST_CHECK(!fs::exists(temp_file));
-
-  Command rmd_cmd{"RMD", "new_folder"};
-  std::string res_rmd = dispatcher.dispatch(session, rmd_cmd);
-  TEST_CHECK(res_rmd.rfind("250", 0) == 0);
-  TEST_CHECK(!fs::exists(test_root / "new_folder"));
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test MKD, RMD, and DELE commands successfully!\n";
-  return true;
-}
-
-bool test_rnfr_rnto_commands() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_rnfr_rnto";
-  std::error_code ec;
-  fs::remove_all(test_root, ec);
-  fs::create_directories(test_root, ec);
-
-  // Tạo file gốc
-  fs::path old_file = test_root / "old_name.txt";
-  {
-    std::ofstream ofs(old_file);
-    ofs << "rename content";
-  }
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  // 1. Lỗi Sequence: Gọi RNTO mà chưa gọi RNFR
-  Command invalid_rnto{"RNTO", "new_name.txt"};
-  std::string res_bad_seq = dispatcher.dispatch(session, invalid_rnto);
-  TEST_CHECK(res_bad_seq.rfind("503", 0) == 0);
-
-  // 2. Gọi RNFR hợp lệ
-  Command rnfr_cmd{"RNFR", "old_name.txt"};
-  std::string res_rnfr = dispatcher.dispatch(session, rnfr_cmd);
-  TEST_CHECK(res_rnfr.rfind("350", 0) == 0);
-
-  // 3. Gọi RNTO hợp lệ
-  Command rnto_cmd{"RNTO", "new_name.txt"};
-  std::string res_rnto = dispatcher.dispatch(session, rnto_cmd);
-  TEST_CHECK(res_rnto.rfind("250", 0) == 0);
-
-  // Kiểm tra file thực tế đã được đổi tên
-  TEST_CHECK(!fs::exists(old_file));
-  TEST_CHECK(fs::exists(test_root / "new_name.txt"));
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test RNFR and RNTO commands successfully!\n";
-  return true;
-}
-
-bool test_config_commands() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_config";
-  std::error_code ec;
-  fs::create_directories(test_root, ec);
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  // 1. Test TYPE
-  Command type_a{"TYPE", "A"};
-  TEST_CHECK(dispatcher.dispatch(session, type_a).rfind("200", 0) == 0);
-
-  Command type_i{"TYPE", "I"};
-  TEST_CHECK(dispatcher.dispatch(session, type_i).rfind("200", 0) == 0);
-
-  // 2. Test MODE & STRU
-  Command mode_s{"MODE", "S"};
-  TEST_CHECK(dispatcher.dispatch(session, mode_s).rfind("200", 0) == 0);
-
-  Command stru_f{"STRU", "F"};
-  TEST_CHECK(dispatcher.dispatch(session, stru_f).rfind("200", 0) == 0);
-
-  // 3. Test NOOP
-  Command noop{"NOOP", ""};
-  TEST_CHECK(dispatcher.dispatch(session, noop).rfind("200", 0) == 0);
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test TYPE, MODE, STRU, NOOP commands successfully!\n";
-  return true;
-}
-
-bool test_system_and_quit_commands() {
-  fs::path test_root = fs::temp_directory_path() / "hftp_test_syst_quit";
-  std::error_code ec;
-  fs::create_directories(test_root, ec);
-
-  Std_FileRepository repo(test_root);
-  SessionService service(repo);
-  CommandDispatcher dispatcher(service);
-  Session session;
-
-  // 1. Test SYST
-  Command syst_cmd{"SYST", ""};
-  std::string res_syst = dispatcher.dispatch(session, syst_cmd);
-  TEST_CHECK(res_syst.rfind("215", 0) == 0);
-
-  // 2. Test QUIT
-  Command quit_cmd{"QUIT", ""};
-  std::string res_quit = dispatcher.dispatch(session, quit_cmd);
-  TEST_CHECK(res_quit.rfind("221", 0) == 0);
-
-  fs::remove_all(test_root, ec);
-  std::cout << "[PASS] Test SYST and QUIT commands successfully!\n";
-  return true;
-}
+} // namespace
 
 int main() {
-  if (!test_session_cwd_and_sandbox()) return 1;
-  if (!test_command_dispatcher_integration()) return 1;
-  if (!test_size_and_mdtm_commands()) return 1;
-  if (!test_mkd_rmd_dele_commands()) return 1;
+    namespace fs = std::filesystem;
+    using hftp::protocol::ReplyCode;
 
-  std::cout << "\n==> ALL SESSION & DISPATCHER TESTS PASSED! <==\n";
-  return 0;
+    const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto root = fs::temp_directory_path() /
+        ("hftp_unified_dispatcher_" + std::to_string(unique));
+    fs::create_directories(root);
+
+    hftp::network::SocketRuntime runtime;
+    Credentials credentials;
+    hftp::control::Authenticator authenticator(credentials);
+    hftp::filesystem::Std_FileRepository repository(root);
+    hftp::transfer::DataConnectionManager data_connections;
+    Transfers transfers;
+    hftp::control::CommandDispatcher dispatcher(
+        authenticator, repository, data_connections, transfers);
+    hftp::session::Session session(1);
+    session.control_peer_address = "127.0.0.1";
+    Replies replies;
+
+    expect(dispatcher, session, replies, "USER", "alice", ReplyCode::need_password);
+    expect(dispatcher, session, replies, "PASS", "secret", ReplyCode::logged_in);
+    expect(dispatcher, session, replies, "PWD", "", ReplyCode::path_created);
+    expect(dispatcher, session, replies, "MKD", "docs", ReplyCode::path_created);
+    expect(dispatcher, session, replies, "CWD", "docs", ReplyCode::file_action_ok);
+    assert(session.current_directory.generic_string() == "/docs");
+
+    std::ofstream(root / "docs" / "sample.txt", std::ios::binary) << "hello";
+    expect(dispatcher, session, replies, "SIZE", "sample.txt", ReplyCode::file_status);
+    assert(replies.values.back().second == "5");
+    expect(dispatcher, session, replies, "MDTM", "sample.txt", ReplyCode::file_status);
+    assert(replies.values.back().second.size() == 14);
+    expect(dispatcher, session, replies, "HASH", "sample.txt", ReplyCode::file_status);
+    assert(replies.values.back().second ==
+           "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+
+    expect(dispatcher, session, replies, "RNFR", "sample.txt", ReplyCode::rename_pending);
+    expect(dispatcher, session, replies, "RNTO", "renamed.txt", ReplyCode::file_action_ok);
+    assert(fs::exists(root / "docs" / "renamed.txt"));
+    expect(dispatcher, session, replies, "DELE", "renamed.txt", ReplyCode::file_action_ok);
+    expect(dispatcher, session, replies, "CDUP", "", ReplyCode::file_action_ok);
+    expect(dispatcher, session, replies, "RMD", "docs", ReplyCode::file_action_ok);
+    expect(dispatcher, session, replies, "SYST", "", ReplyCode::system_type);
+    expect(dispatcher, session, replies, "STRU", "F", ReplyCode::ok);
+
+    dispatcher.end_session(session);
+    std::error_code cleanup_error;
+    fs::remove_all(root, cleanup_error);
+    return 0;
 }

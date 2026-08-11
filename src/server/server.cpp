@@ -1,12 +1,14 @@
 #include "hftp/server/server.h"
 
 #include <array>
+#include <mutex>
 #include <string>
 #include <string_view>
 
 #include "hftp/control/command_parser.h"
 #include "hftp/control/command_dispatcher.h"
 #include "hftp/control/crlf_framer.h"
+#include "hftp/logging/logger.h"
 #include "hftp/protocol/reply.h"
 #include "hftp/session/session.h"
 
@@ -35,8 +37,15 @@ common::Status socket_failure(std::string message) {
 bool send_all(network::NativeSocket socket, std::string_view bytes) {
     std::size_t sent = 0;
     while (sent < bytes.size()) {
+        const int flags =
+#ifdef _WIN32
+            0;
+#else
+            MSG_NOSIGNAL;
+#endif
         const int result = ::send(
-            socket, bytes.data() + sent, static_cast<int>(bytes.size() - sent), 0);
+            socket, bytes.data() + sent,
+            static_cast<int>(bytes.size() - sent), flags);
         if (result <= 0) {
             return false;
         }
@@ -50,16 +59,21 @@ public:
     explicit SocketReplySink(network::NativeSocket socket) : socket_(socket) {}
 
     void send(protocol::ReplyCode code, std::string text) override {
+        const std::scoped_lock lock(mutex_);
         if (!failed_) {
             failed_ = !send_all(socket_, formatter_.format(code, text));
         }
     }
 
-    [[nodiscard]] bool failed() const noexcept { return failed_; }
+    [[nodiscard]] bool failed() const noexcept {
+        const std::scoped_lock lock(mutex_);
+        return failed_;
+    }
 
 private:
     network::NativeSocket socket_;
     protocol::ReplyFormatter formatter_;
+    mutable std::mutex mutex_;
     bool failed_{false};
 };
 
@@ -84,8 +98,11 @@ common::Status Server::start(std::uint16_t control_port) {
     }
 
     const int reuse_address = 1;
-    ::setsockopt(listener.native_handle(), SOL_SOCKET, SO_REUSEADDR,
-                 reinterpret_cast<const char*>(&reuse_address), sizeof(reuse_address));
+    if (::setsockopt(listener.native_handle(), SOL_SOCKET, SO_REUSEADDR,
+                     reinterpret_cast<const char*>(&reuse_address),
+                     sizeof(reuse_address)) != 0) {
+        return socket_failure("Unable to configure TCP listener");
+    }
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
@@ -113,7 +130,19 @@ common::Status Server::start(std::uint16_t control_port) {
     control_port_ = ntohs(address.sin_port);
     stopping_.store(false);
     running_.store(true);
-    accept_thread_ = std::jthread([this] { accept_loop(); });
+    try {
+        accept_thread_ = std::jthread([this] { accept_loop(); });
+    } catch (const std::system_error& error) {
+        running_.store(false);
+        listener_.close();
+        return {common::Error::busy,
+                "Unable to start accept worker: " + std::string(error.what())};
+    }
+    if (logger_ != nullptr) {
+        logger_->write(logging::Level::info,
+                       "TCP control listening port=" +
+                           std::to_string(control_port_));
+    }
     return {};
 }
 
@@ -125,7 +154,18 @@ void Server::join() {
     if (accept_thread_.joinable()) {
         accept_thread_.join();
     }
+    std::vector<ClientWorker> client_workers;
+    {
+        const std::scoped_lock lock(client_threads_mutex_);
+        client_workers.swap(client_workers_);
+    }
+    for (auto& worker : client_workers) {
+        if (worker.thread.joinable()) {
+            worker.thread.join();
+        }
+    }
     listener_.close();
+    running_.store(false);
 }
 
 void Server::accept_loop() {
@@ -146,7 +186,14 @@ void Server::accept_loop() {
             continue;
         }
 
-        network::Socket client(::accept(listener, nullptr, nullptr));
+        sockaddr_in peer{};
+#ifdef _WIN32
+        int peer_length = sizeof(peer);
+#else
+        socklen_t peer_length = sizeof(peer);
+#endif
+        network::Socket client(::accept(
+            listener, reinterpret_cast<sockaddr*>(&peer), &peer_length));
         if (!client.valid()) {
             if (stopping_.load()) {
                 break;
@@ -157,24 +204,78 @@ void Server::accept_loop() {
             break;
         }
 
-        handle_client(std::move(client));
+        reap_finished_clients();
+        std::array<char, INET_ADDRSTRLEN> peer_text{};
+        if (::inet_ntop(AF_INET, &peer.sin_addr, peer_text.data(),
+                        peer_text.size()) == nullptr) {
+            continue;
+        }
+        auto finished = std::make_shared<std::atomic_bool>(false);
+        std::jthread thread(
+            [this, client = std::move(client), address = std::string(peer_text.data()),
+             finished]
+            () mutable {
+                handle_client(std::move(client), std::move(address));
+                finished->store(true, std::memory_order_release);
+            });
+        {
+            const std::scoped_lock lock(client_threads_mutex_);
+            client_workers_.push_back({std::move(finished), std::move(thread)});
+        }
     }
-    running_.store(false);
 }
 
-void Server::handle_client(network::Socket client) {
+void Server::reap_finished_clients() {
+    std::vector<ClientWorker> finished;
+    {
+        const std::scoped_lock lock(client_threads_mutex_);
+        auto worker = client_workers_.begin();
+        while (worker != client_workers_.end()) {
+            if (worker->finished->load(std::memory_order_acquire)) {
+                finished.push_back(std::move(*worker));
+                worker = client_workers_.erase(worker);
+            } else {
+                ++worker;
+            }
+        }
+    }
+    for (auto& worker : finished) {
+        if (worker.thread.joinable()) {
+            worker.thread.join();
+        }
+    }
+}
+
+void Server::handle_client(network::Socket client, std::string peer_address) {
     session::Session session(next_session_id_.fetch_add(1));
+    session.control_peer_address = peer_address;
+    const auto active = active_sessions_.fetch_add(1) + 1;
+    if (logger_ != nullptr) {
+        logger_->write(logging::Level::info,
+                       "client connected peer=" + peer_address +
+                           " active_sessions=" + std::to_string(active),
+                       session.id);
+    }
     control::CrlfFramer framer;
     const control::CommandParser parser;
     SocketReplySink replies(client.native_handle());
 
     replies.send(protocol::ReplyCode::ready, "Service ready");
     if (replies.failed()) {
+        dispatcher_.end_session(session);
+        const auto remaining = active_sessions_.fetch_sub(1) - 1;
+        if (logger_ != nullptr) {
+            logger_->write(logging::Level::warning,
+                           "greeting failed active_sessions=" +
+                               std::to_string(remaining),
+                           session.id);
+        }
         return;
     }
 
     std::array<char, 4096> bytes{};
-    while (!stopping_.load()) {
+    bool close_session = false;
+    while (!stopping_.load() && !close_session) {
         fd_set readable;
         FD_ZERO(&readable);
         FD_SET(client.native_handle(), &readable);
@@ -194,7 +295,7 @@ void Server::handle_client(network::Socket client) {
         const int received = ::recv(
             client.native_handle(), bytes.data(), static_cast<int>(bytes.size()), 0);
         if (received <= 0) {
-            return;
+            break;
         }
 
         auto lines = framer.push(
@@ -202,7 +303,7 @@ void Server::handle_client(network::Socket client) {
         if (framer.failed()) {
             replies.send(protocol::ReplyCode::syntax_error,
                          "Command line exceeds maximum length");
-            return;
+            break;
         }
 
         for (const auto& line : lines) {
@@ -210,16 +311,32 @@ void Server::handle_client(network::Socket client) {
             if (!parsed.ok) {
                 replies.send(protocol::ReplyCode::syntax_error, "Syntax error");
                 if (replies.failed()) {
-                    return;
+                    close_session = true;
+                    break;
                 }
                 continue;
             }
 
+            if (logger_ != nullptr) {
+                logger_->write(logging::Level::info,
+                               "command=" + parsed.command.verb,
+                               session.id);
+            }
+
             const auto action = dispatcher_.dispatch(parsed.command, session, replies);
             if (replies.failed() || action == control::DispatchAction::close_session) {
-                return;
+                close_session = true;
+                break;
             }
         }
+    }
+    dispatcher_.end_session(session);
+    const auto remaining = active_sessions_.fetch_sub(1) - 1;
+    if (logger_ != nullptr) {
+        logger_->write(logging::Level::info,
+                       "client disconnected peer=" + peer_address +
+                           " active_sessions=" + std::to_string(remaining),
+                       session.id);
     }
 }
 

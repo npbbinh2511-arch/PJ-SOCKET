@@ -1,6 +1,7 @@
 #ifndef HFTP_CLIENT_CLIENT_H
 #define HFTP_CLIENT_CLIENT_H
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -16,12 +17,14 @@ public:
     [[nodiscard]] common::Status connect(std::string_view host, std::uint16_t port);
     [[nodiscard]] common::Status send_command(std::string_view command);
     [[nodiscard]] common::Status receive_reply(std::vector<std::string>& replies);
+    [[nodiscard]] common::Status local_ipv4(std::string& address) const;
     void disconnect() noexcept;
-    [[nodiscard]] bool connected() const noexcept { return control_socket_.valid(); }
+    [[nodiscard]] bool connected() const noexcept { return connected_.load(); }
 
 private:
     network::Socket control_socket_;
     control::CrlfFramer reply_framer_;
+    std::atomic_bool connected_{false};
 };
 
 } // namespace hftp::client

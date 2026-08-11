@@ -35,6 +35,14 @@ int close_direction() noexcept {
 #endif
 }
 
+int send_flags() noexcept {
+#ifdef _WIN32
+    return 0;
+#else
+    return MSG_NOSIGNAL;
+#endif
+}
+
 } // namespace
 
 common::Status Client::connect(std::string_view host, std::uint16_t port) {
@@ -80,6 +88,7 @@ common::Status Client::connect(std::string_view host, std::uint16_t port) {
     if (!control_socket_.valid()) {
         return socket_failure("Unable to connect to server");
     }
+    connected_.store(true);
     return {};
 }
 
@@ -102,8 +111,11 @@ common::Status Client::send_command(std::string_view command) {
                 ? std::numeric_limits<int>::max()
                 : remaining);
         const int result = ::send(
-            control_socket_.native_handle(), wire_command.data() + sent, chunk_size, 0);
+            control_socket_.native_handle(), wire_command.data() + sent,
+            chunk_size, send_flags());
         if (result <= 0) {
+            connected_.store(false);
+            ::shutdown(control_socket_.native_handle(), close_direction());
             return socket_failure("Unable to send FTP command");
         }
         sent += static_cast<std::size_t>(result);
@@ -122,17 +134,19 @@ common::Status Client::receive_reply(std::vector<std::string>& replies) {
         const int received = ::recv(
             control_socket_.native_handle(), bytes.data(), static_cast<int>(bytes.size()), 0);
         if (received == 0) {
-            disconnect();
+            connected_.store(false);
             return {common::Error::socket_error, "Server closed the control connection"};
         }
         if (received < 0) {
+            connected_.store(false);
             return socket_failure("Unable to receive FTP reply");
         }
 
         auto framed = reply_framer_.push(
             std::string_view(bytes.data(), static_cast<std::size_t>(received)));
         if (reply_framer_.failed()) {
-            disconnect();
+            connected_.store(false);
+            ::shutdown(control_socket_.native_handle(), close_direction());
             return {common::Error::protocol_error, "FTP reply exceeds maximum line length"};
         }
         for (auto& line : framed) {
@@ -142,7 +156,36 @@ common::Status Client::receive_reply(std::vector<std::string>& replies) {
     return {};
 }
 
+common::Status Client::local_ipv4(std::string& address) const {
+    address.clear();
+    if (!connected() || !control_socket_.valid()) {
+        return {common::Error::socket_error, "Control connection is not open"};
+    }
+    sockaddr_storage storage{};
+#ifdef _WIN32
+    int length = sizeof(storage);
+#else
+    socklen_t length = sizeof(storage);
+#endif
+    if (::getsockname(control_socket_.native_handle(),
+                      reinterpret_cast<sockaddr*>(&storage), &length) != 0) {
+        return socket_failure("Unable to read local control address");
+    }
+    if (storage.ss_family != AF_INET) {
+        return {common::Error::invalid_argument,
+                "Active UDP mode currently requires IPv4"};
+    }
+    const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(&storage);
+    std::array<char, INET_ADDRSTRLEN> text{};
+    if (::inet_ntop(AF_INET, &ipv4->sin_addr, text.data(), text.size()) == nullptr) {
+        return socket_failure("Unable to format local IPv4 address");
+    }
+    address = text.data();
+    return {};
+}
+
 void Client::disconnect() noexcept {
+    connected_.store(false);
     if (control_socket_.valid()) {
         ::shutdown(control_socket_.native_handle(), close_direction());
         control_socket_.close();

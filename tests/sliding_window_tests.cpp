@@ -1,10 +1,12 @@
 #include "hftp/transfer/file_transfer.h"
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <thread>
 #include <chrono>
 #include <filesystem>
 #include <cassert>
+#include <iterator>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -22,6 +24,15 @@ void create_dummy_file(const std::string& path, std::size_t size_mb) {
     out.close();
 }
 
+bool same_file_contents(const std::string& lhs, const std::string& rhs) {
+    std::ifstream left(lhs, std::ios::binary);
+    std::ifstream right(rhs, std::ios::binary);
+    return std::equal(std::istreambuf_iterator<char>(left),
+                      std::istreambuf_iterator<char>(),
+                      std::istreambuf_iterator<char>(right),
+                      std::istreambuf_iterator<char>());
+}
+
 int main() {
 #ifdef _WIN32
     WSADATA wsaData;
@@ -37,6 +48,7 @@ int main() {
     std::cout << "--- BAT DAU TEST SLIDING WINDOW (GO-BACK-N / PIPELINING) ---" << std::endl;
 
     TransferContext ctx; 
+    ctx.transfer_id = 3;
     ctx.endpoint = session::UdpEndpoint{"127.0.0.1", 8083};
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -44,6 +56,8 @@ int main() {
     // Luồng Receiver (Server)
     std::thread receiver_thread([&]() {
         rdt::StopAndWaitOptions options;
+        options.timeout = std::chrono::milliseconds(50);
+        options.max_retries = 100;
         auto result = FileTransferEngine::receive_file_from_client(out_file, ctx, options);
         assert(result.success && "Loi: Receiver nhan file that bai!");
     });
@@ -52,6 +66,8 @@ int main() {
 
     // Cấu hình Sender với Sliding Window size = 8
     rdt::StopAndWaitOptions options;
+    options.timeout = std::chrono::milliseconds(50);
+    options.max_retries = 100;
     options.window_size = 8;         // Kích thước Cửa sổ trượt: 8 gói tin
     options.drop_probability = 0.05; // Giả lập rớt 5% gói tin để kiểm tra khôi phục lỗi theo Window
 
@@ -68,6 +84,7 @@ int main() {
     auto in_size = std::filesystem::file_size(in_file);
     auto out_size = std::filesystem::file_size(out_file);
     assert(in_size == out_size);
+    assert(same_file_contents(in_file, out_file));
 
     std::cout << ">> SUCCESS: Truyen file " << (out_size / (1024 * 1024)) 
               << " MB thanh cong trong " << diff.count() << " giay!" << std::endl;
