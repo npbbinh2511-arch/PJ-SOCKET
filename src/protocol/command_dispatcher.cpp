@@ -26,11 +26,9 @@ static std::string format_ftp_time(std::filesystem::file_time_type ftime) {
     return ss.str();
 }
 
-CommandDispatcher::CommandDispatcher(const session::SessionService& session_service)
-    : m_session_service(session_service) {}
+CommandDispatcher::CommandDispatcher(const session::SessionService& session_service) : m_session_service(session_service) {}
 
 std::string CommandDispatcher::dispatch(session::Session& session, const Command& cmd) {
-    
     // 1. Lệnh PWD
     if (cmd.verb == "PWD") {
         std::string current_path = m_session_service.get_pwd(session).string();
@@ -109,6 +107,81 @@ std::string CommandDispatcher::dispatch(session::Session& session, const Command
         std::string time_str = format_ftp_time(last_write);
         return m_formatter.format(ReplyCode::file_status, time_str);
     }
+
+    // 6. Lệnh MKD <dirname> (Make Directory)
+    if (cmd.verb == "MKD") {
+        if (cmd.argument.empty()) {
+            return m_formatter.format(ReplyCode::parameter_error, "Syntax error: missing directory name.");
+        }
+
+        std::filesystem::path physical_path;
+        auto status = m_session_service.resolve_path(session, cmd.argument, physical_path);
+        if (status.error != common::Error::none) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Access denied or invalid path.");
+        }
+
+        std::error_code ec;
+        if (std::filesystem::exists(physical_path, ec)) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Directory or file already exists.");
+        }
+
+        if (!std::filesystem::create_directory(physical_path, ec) || ec) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Could not create directory.");
+        }
+
+        return m_formatter.format(ReplyCode::path_created, "\"" + cmd.argument + "\" directory created.");
+    }
+
+    // 7. Lệnh RMD <dirname> (Remove Directory)
+    if (cmd.verb == "RMD") {
+        if (cmd.argument.empty()) {
+            return m_formatter.format(ReplyCode::parameter_error, "Syntax error: missing directory name.");
+        }
+
+        std::filesystem::path physical_path;
+        auto status = m_session_service.resolve_path(session, cmd.argument, physical_path);
+        if (status.error != common::Error::none) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Access denied or invalid path.");
+        }
+
+        std::error_code ec;
+        if (!std::filesystem::is_directory(physical_path, ec)) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Not a directory.");
+        }
+
+        if (!std::filesystem::remove(physical_path, ec) || ec) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Could not remove directory (must be empty).");
+        }
+
+        return m_formatter.format(ReplyCode::file_action_ok, "Directory removed.");
+    }
+
+    // 8. Lệnh DELE <filename> (Delete File)
+    if (cmd.verb == "DELE") {
+        if (cmd.argument.empty()) {
+            return m_formatter.format(ReplyCode::parameter_error, "Syntax error: missing filename.");
+        }
+
+        std::filesystem::path physical_path;
+        auto status = m_session_service.resolve_path(session, cmd.argument, physical_path);
+        if (status.error != common::Error::none) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Access denied or invalid path.");
+        }
+
+        std::error_code ec;
+        if (std::filesystem::is_directory(physical_path, ec)) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Path is a directory, use RMD instead.");
+        }
+
+        if (!std::filesystem::remove(physical_path, ec) || ec) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Could not delete file.");
+        }
+
+        return m_formatter.format(ReplyCode::file_action_ok, "File deleted.");
+    }
+
+    return m_formatter.format(ReplyCode::not_implemented, "Command not implemented.");
+
 }
 
 } // namespace hftp::protocol
