@@ -152,6 +152,48 @@ bool test_mkd_rmd_dele_commands() {
   return true;
 }
 
+bool test_rnfr_rnto_commands() {
+  fs::path test_root = fs::temp_directory_path() / "hftp_test_rnfr_rnto";
+  std::error_code ec;
+  fs::remove_all(test_root, ec);
+  fs::create_directories(test_root, ec);
+
+  // Tạo file gốc
+  fs::path old_file = test_root / "old_name.txt";
+  {
+    std::ofstream ofs(old_file);
+    ofs << "rename content";
+  }
+
+  Std_FileRepository repo(test_root);
+  SessionService service(repo);
+  CommandDispatcher dispatcher(service);
+  Session session;
+
+  // 1. Lỗi Sequence: Gọi RNTO mà chưa gọi RNFR
+  Command invalid_rnto{"RNTO", "new_name.txt"};
+  std::string res_bad_seq = dispatcher.dispatch(session, invalid_rnto);
+  TEST_CHECK(res_bad_seq.rfind("503", 0) == 0);
+
+  // 2. Gọi RNFR hợp lệ
+  Command rnfr_cmd{"RNFR", "old_name.txt"};
+  std::string res_rnfr = dispatcher.dispatch(session, rnfr_cmd);
+  TEST_CHECK(res_rnfr.rfind("350", 0) == 0);
+
+  // 3. Gọi RNTO hợp lệ
+  Command rnto_cmd{"RNTO", "new_name.txt"};
+  std::string res_rnto = dispatcher.dispatch(session, rnto_cmd);
+  TEST_CHECK(res_rnto.rfind("250", 0) == 0);
+
+  // Kiểm tra file thực tế đã được đổi tên
+  TEST_CHECK(!fs::exists(old_file));
+  TEST_CHECK(fs::exists(test_root / "new_name.txt"));
+
+  fs::remove_all(test_root, ec);
+  std::cout << "[PASS] Test RNFR and RNTO commands successfully!\n";
+  return true;
+}
+
 int main() {
   if (!test_session_cwd_and_sandbox()) return 1;
   if (!test_command_dispatcher_integration()) return 1;

@@ -182,6 +182,64 @@ std::string CommandDispatcher::dispatch(session::Session& session, const Command
 
     return m_formatter.format(ReplyCode::not_implemented, "Command not implemented.");
 
+    // 9. Lệnh RNFR <old_path> (Rename From)
+    if (cmd.verb == "RNFR") {
+        if (cmd.argument.empty()) {
+            return m_formatter.format(ReplyCode::parameter_error, "Syntax error: missing file path.");
+        }
+
+        std::filesystem::path physical_path;
+        auto status = m_session_service.resolve_path(session, cmd.argument, physical_path);
+        if (status.error != common::Error::none) {
+            return m_formatter.format(ReplyCode::file_unavailable, "File or directory not found.");
+        }
+
+        std::error_code ec;
+        if (!std::filesystem::exists(physical_path, ec)) {
+            return m_formatter.format(ReplyCode::file_unavailable, "File or directory does not exist.");
+        }
+
+        // Lưu đường dẫn gốc vào session và chờ RNTO
+        {
+            std::lock_guard<std::mutex> lock(session.mutex);
+            session.rename_from = physical_path;
+        }
+
+        return m_formatter.format(ReplyCode::rename_pending, "Requested file action pending further information.");
+    }
+
+    // 10. Lệnh RNTO <new_path> (Rename To)
+    if (cmd.verb == "RNTO") {
+        std::optional<std::filesystem::path> old_physical_path;
+        {
+            std::lock_guard<std::mutex> lock(session.mutex);
+            old_physical_path = session.rename_from;
+            session.rename_from.reset(); // Reset trạng thái RNFR sau khi xử lý
+        }
+
+        // Bắt buộc phải gọi RNFR thành công trước đó (kiểm tra sequence error)
+        if (!old_physical_path.has_value()) {
+            return m_formatter.format(ReplyCode::bad_sequence, "Bad sequence of commands. Send RNFR first.");
+        }
+
+        if (cmd.argument.empty()) {
+            return m_formatter.format(ReplyCode::parameter_error, "Syntax error: missing new file path.");
+        }
+
+        std::filesystem::path new_physical_path;
+        auto status = m_session_service.resolve_path(session, cmd.argument, new_physical_path);
+        if (status.error != common::Error::none) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Access denied or invalid target path.");
+        }
+
+        std::error_code ec;
+        std::filesystem::rename(*old_physical_path, new_physical_path, ec);
+        if (ec) {
+            return m_formatter.format(ReplyCode::file_unavailable, "Failed to rename file or directory.");
+        }
+
+        return m_formatter.format(ReplyCode::file_action_ok, "File action successful.");
+    }
 }
 
 } // namespace hftp::protocol
