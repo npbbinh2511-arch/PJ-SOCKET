@@ -272,6 +272,16 @@ std::string CommandDispatcher::dispatch(session::Session& session, const Command
     if (cmd.verb == "NOOP") {
         return m_formatter.format(ReplyCode::ok, "OK.");
     }
+
+    // 15. Lệnh SYST (System)
+    if (cmd.verb == "SYST") {
+        return m_formatter.format(ReplyCode::system_type, "UNIX Type: L8");
+    }
+
+    // 16. Lệnh QUIT (Logout)
+    if (cmd.verb == "QUIT") {
+        return m_formatter.format(ReplyCode::goodbye, "Goodbye.");
+    }
 }
 
 } // namespace hftp::protocol

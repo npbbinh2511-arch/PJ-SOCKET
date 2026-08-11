@@ -227,6 +227,31 @@ bool test_config_commands() {
   return true;
 }
 
+bool test_system_and_quit_commands() {
+  fs::path test_root = fs::temp_directory_path() / "hftp_test_syst_quit";
+  std::error_code ec;
+  fs::create_directories(test_root, ec);
+
+  Std_FileRepository repo(test_root);
+  SessionService service(repo);
+  CommandDispatcher dispatcher(service);
+  Session session;
+
+  // 1. Test SYST
+  Command syst_cmd{"SYST", ""};
+  std::string res_syst = dispatcher.dispatch(session, syst_cmd);
+  TEST_CHECK(res_syst.rfind("215", 0) == 0);
+
+  // 2. Test QUIT
+  Command quit_cmd{"QUIT", ""};
+  std::string res_quit = dispatcher.dispatch(session, quit_cmd);
+  TEST_CHECK(res_quit.rfind("221", 0) == 0);
+
+  fs::remove_all(test_root, ec);
+  std::cout << "[PASS] Test SYST and QUIT commands successfully!\n";
+  return true;
+}
+
 int main() {
   if (!test_session_cwd_and_sandbox()) return 1;
   if (!test_command_dispatcher_integration()) return 1;

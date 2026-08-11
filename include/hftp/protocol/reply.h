@@ -8,7 +8,7 @@ namespace hftp::protocol {
 
 enum class ReplyCode : int {
     data_already_open = 125, opening_data = 150, ok = 200, status = 211,
-    file_status = 213, help = 214, ready = 220, goodbye = 221,
+    file_status = 213, help = 214, system_type = 215, ready = 220, goodbye = 221,
     transfer_complete = 226, passive = 227, logged_in = 230,
     file_action_ok = 250, path_created = 257, need_password = 331,
     rename_pending = 350, unavailable = 421, cannot_open_data = 425,
