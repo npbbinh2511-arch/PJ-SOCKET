@@ -27,6 +27,7 @@ add_library(hftp STATIC
     src/rdt/crc32.cpp
     src/rdt/packet.cpp
     src/rdt/reliable_transport.cpp
+    src/transfer/file_transfer.cpp
 )
 
 # Link Windows Socket Library (WinSock)
@@ -167,6 +168,36 @@ target_link_libraries(hftp_client PRIVATE hftp)
         add_test(NAME rdt_loopback COMMAND rdt_tests)
     endif()
 
+    # --- Transfer Tests ---
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/transfer_tests.cpp")
+        add_executable(transfer_tests tests/transfer_tests.cpp)
+        target_link_libraries(transfer_tests PRIVATE hftp)
+        if(WIN32)
+            target_link_libraries(transfer_tests PRIVATE ws2_32)
+        endif()
+        add_test(NAME transfer_tests COMMAND transfer_tests)
+    endif()
+
+    # --- Cancellation Tests ---
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/cancellation_tests.cpp")
+        add_executable(cancellation_tests tests/cancellation_tests.cpp)
+        target_link_libraries(cancellation_tests PRIVATE hftp)
+        if(WIN32)
+            target_link_libraries(cancellation_tests PRIVATE ws2_32)
+        endif()
+        add_test(NAME cancellation_tests COMMAND cancellation_tests)
+    endif()
+
+    # --- Sliding Window Tests (Go-Back-N) ---
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sliding_window_tests.cpp")
+        add_executable(sliding_window_tests tests/sliding_window_tests.cpp)
+        target_link_libraries(sliding_window_tests PRIVATE hftp)
+        if(WIN32)
+            target_link_libraries(sliding_window_tests PRIVATE ws2_32)
+        endif()
+        add_test(NAME sliding_window_tests COMMAND sliding_window_tests)
+    endif()
+
     if(MINGW)
         if(TARGET socket_tests)
             target_link_options(socket_tests PRIVATE -static)
@@ -179,6 +210,15 @@ target_link_libraries(hftp_client PRIVATE hftp)
         endif()
         if(TARGET rdt_tests)
             target_link_options(rdt_tests PRIVATE -static)
+        endif()
+        if(TARGET transfer_tests)
+            target_link_options(transfer_tests PRIVATE -static)
+        endif()
+        if(TARGET cancellation_tests)
+            target_link_options(cancellation_tests PRIVATE -static)
+        endif()
+        if(TARGET sliding_window_tests)
+            target_link_options(sliding_window_tests PRIVATE -static)
         endif()
     endif()
 endif()
