@@ -40,5 +40,3 @@ public:
 } // namespace hftp::filesystem
 
 #endif // HFTP_FILESYSTEM_FILE_REPOSITORY_H
-
-#endif 

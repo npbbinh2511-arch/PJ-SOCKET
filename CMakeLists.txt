@@ -19,7 +19,6 @@ add_library(hftp STATIC
   src/server/server.cpp
   src/transfer/data_connection_manager.cpp
   src/control/command_dispatcher.cpp
-  src/filesystem/file_repository.cpp
 )
 target_include_directories(hftp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(hftp PUBLIC Threads::Threads)
@@ -75,16 +74,13 @@ if(BUILD_TESTING)
   target_link_libraries(filesystem_test PRIVATE hftp)
   add_test(NAME filesystem_repository COMMAND filesystem_test)
 
-  add_executable(session_test tests/session_test.cpp)
-  target_link_libraries(session_test PRIVATE hftp)
-  add_test(NAME session_management COMMAND session_test)
+  add_executable(session_service_tests tests/session_test_1.cpp)
+  target_link_libraries(session_service_tests PRIVATE hftp)
+  add_test(NAME session_management COMMAND session_service_tests)
 endif()
 
 add_executable(hftp_server apps/server_main.cpp)
 target_link_libraries(hftp_server PRIVATE hftp)
 
 add_executable(hftp_client apps/client_main.cpp)
-target_link_libraries(hftp_client PRIVATE hftp) 
-
-add_executable(filesystem_test tests/filesystem_test.cpp)
-target_link_libraries(filesystem_test PRIVATE hftp)
+target_link_libraries(hftp_client PRIVATE hftp)
