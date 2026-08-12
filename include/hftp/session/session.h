@@ -33,6 +33,7 @@ struct Session {
     void finish_transfer();
 
     std::uint64_t id{};
+    std::string control_peer_address;
     std::string username;
     AuthState auth{AuthState::unauthenticated};
     std::filesystem::path current_directory{"/"};

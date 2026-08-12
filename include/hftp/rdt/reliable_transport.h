@@ -2,9 +2,11 @@
 #define HFTP_RDT_RELIABLE_TRANSPORT_H
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <vector>
+
 #include "hftp/common/result.h"
 #include "hftp/transfer/transfer.h"
 
@@ -15,7 +17,8 @@ struct StopAndWaitOptions {
     std::uint32_t max_retries{8};
     std::size_t payload_size{1200};
     double drop_probability{0.0};
-    std::size_t window_size{4}; // Cửa sổ trượt cho Go-Back-N (Default: 4)
+    std::size_t window_size{4};
+    std::uint32_t fault_seed{0xC0FFEEU};
 };
 
 class ReliableTransport {
@@ -25,13 +28,6 @@ public:
         const transfer::TransferContext& context, std::span<const std::byte> data) = 0;
     [[nodiscard]] virtual common::Status receive(
         const transfer::TransferContext& context, std::vector<std::byte>& data) = 0;
-
-    // TODO(A) Basic:
-    // - Implement Stop-and-Wait with sequence numbers, ACK, timeout, bounded retry,
-    //   duplicate suppression, cancellation checks, and terminal handshake.
-    // - Report timeout, malformed peer packet, cancellation, and retry exhaustion.
-    // - Tests: happy path, lost ACK, duplicate data, corruption, cancellation.
-    // TODO(A) Excellent: add a separate window strategy; do not change this contract.
 };
 
 std::unique_ptr<ReliableTransport> create_stop_and_wait_transport(

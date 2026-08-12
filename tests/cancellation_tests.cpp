@@ -40,6 +40,7 @@ int main() {
 
     std::atomic_bool cancel_flag{false};
     TransferContext ctx; 
+    ctx.transfer_id = 2;
     ctx.endpoint = session::UdpEndpoint{"127.0.0.1", 8082};
     ctx.cancellation = &cancel_flag; // Gán cờ hủy vào Context
 

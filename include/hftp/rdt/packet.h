@@ -8,7 +8,13 @@
 
 namespace hftp::rdt {
 
-enum class PacketFlag : std::uint8_t { data = 1, ack = 2, finish = 4, reset = 8 };
+enum class PacketFlag : std::uint8_t {
+    data = 1,
+    ack = 2,
+    finish = 4,
+    reset = 8,
+    hello = 16,
+};
 
 struct Packet {
     std::uint32_t transfer_id{};
@@ -24,13 +30,6 @@ class PacketWire {
 public:
     [[nodiscard]] common::Status serialize(const Packet& packet, std::vector<std::byte>& bytes) const;
     [[nodiscard]] common::Status deserialize(std::span<const std::byte> bytes, Packet& packet) const;
-
-    // TODO(A):
-    // - Define a versioned byte layout and serialize each fixed-width field explicitly.
-    // - Convert multi-byte integers to/from network order; never send the C++ struct.
-    // - Validate flags, declared length, datagram size, transfer ID, and checksum.
-    // - Leave output unchanged on malformed input.
-    // - Tests: golden bytes, truncation, excess payload, bad flag, bad checksum.
 };
 
 } // namespace hftp::rdt

@@ -1,10 +1,12 @@
 #include "hftp/transfer/file_transfer.h"
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <thread>
 #include <chrono>
 #include <filesystem>
 #include <cassert>
+#include <iterator>
 
 // Thêm thư viện mạng của Windows
 #ifdef _WIN32
@@ -20,6 +22,15 @@ void create_dummy_file(const std::string& path) {
     out << "Project: PJ-SOCKET\n";
     out << "Module: STOR / RETR over UDP (Stop-and-Wait RDT)\n";
     out.close();
+}
+
+bool same_file_contents(const std::string& lhs, const std::string& rhs) {
+    std::ifstream left(lhs, std::ios::binary);
+    std::ifstream right(rhs, std::ios::binary);
+    return std::equal(std::istreambuf_iterator<char>(left),
+                      std::istreambuf_iterator<char>(),
+                      std::istreambuf_iterator<char>(right),
+                      std::istreambuf_iterator<char>());
 }
 
 int main() {
@@ -42,6 +53,7 @@ int main() {
     std::cout << "--- BẮT ĐẦU TEST TRUYỀN FILE ---" << std::endl;
 
     TransferContext ctx; 
+    ctx.transfer_id = 1;
     ctx.endpoint = session::UdpEndpoint{"127.0.0.1", 8081};
 
     std::thread receiver_thread([&]() {
@@ -73,6 +85,7 @@ int main() {
     auto in_size = std::filesystem::file_size(in_file);
     auto out_size = std::filesystem::file_size(out_file);
     assert(in_size == out_size);
+    assert(same_file_contents(in_file, out_file));
 
     std::cout << ">> SUCCESS: File duoc truyen nguyen ven! (" << out_size << " bytes)" << std::endl;
     std::cout << "--- KẾT THÚC TEST ---" << std::endl;
