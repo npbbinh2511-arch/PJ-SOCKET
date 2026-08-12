@@ -129,10 +129,11 @@ common::Status write_local_file(const std::filesystem::path& path,
 }
 
 std::string completion_message(std::span<const std::uint8_t> local_bytes,
+                               std::span<const std::uint8_t> transferred_bytes,
                                const std::filesystem::path& result_name = {}) {
     std::string message = "Transfer complete bytes=" +
         std::to_string(local_bytes.size()) + " sha256=" +
-        integrity::sha256_hex(local_bytes);
+        integrity::sha256_hex(transferred_bytes);
     if (!result_name.empty()) {
         message += " path=" + result_name.generic_string();
     }
@@ -192,7 +193,8 @@ common::Status FileTransferEngine::start(const TransferContext& context) {
             return status;
         }
         return {common::Error::none,
-                completion_message(local_bytes, context.result_name)};
+                completion_message(
+                    local_bytes, network_octets, context.result_name)};
     }
 
     auto receiver = rdt::create_stop_and_wait_transport(options_);
@@ -225,7 +227,8 @@ common::Status FileTransferEngine::start(const TransferContext& context) {
         return status;
     }
     return {common::Error::none,
-            completion_message(local_bytes, context.result_name)};
+            completion_message(
+                local_bytes, received_octets, context.result_name)};
 }
 
 void FileTransferEngine::request_cancel(std::uint64_t transfer_id) {
@@ -251,7 +254,7 @@ FileTransferResult FileTransferEngine::send_file_to_client(
     auto sender = rdt::create_stop_and_wait_transport(options);
     status = sender->send(context, network_bytes);
     if (status) {
-        status.message = completion_message(local_bytes);
+        status.message = completion_message(local_bytes, network_octets);
     }
     return as_result(status);
 }
@@ -271,7 +274,7 @@ FileTransferResult FileTransferEngine::receive_file_from_client(
         : received_octets;
     status = write_local_file(save_path, local_bytes, false);
     if (status) {
-        status.message = completion_message(local_bytes);
+        status.message = completion_message(local_bytes, received_octets);
     }
     return as_result(status);
 }

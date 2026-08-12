@@ -1,6 +1,7 @@
 #ifndef HFTP_CLIENT_DATA_CHANNEL_H
 #define HFTP_CLIENT_DATA_CHANNEL_H
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -21,6 +22,7 @@ struct DataTransferSpec {
     session::UdpEndpoint active_local_endpoint;
     std::shared_ptr<network::Socket> bound_socket;
     std::uint64_t expected_size{};
+    std::atomic_bool* cancellation{};
     std::function<void(std::uint64_t, std::uint64_t)> progress;
 };
 

@@ -59,7 +59,7 @@ common::Status DataChannelClient::upload(
         return status;
     }
     std::atomic_bool cancelled{false};
-    context.cancellation = &cancelled;
+    context.cancellation = spec.cancellation ? spec.cancellation : &cancelled;
     const auto result = transfer::FileTransferEngine::send_file_to_client(
         local_path.string(), context, options_);
     return result.success
@@ -76,7 +76,7 @@ common::Status DataChannelClient::download(
         return status;
     }
     std::atomic_bool cancelled{false};
-    context.cancellation = &cancelled;
+    context.cancellation = spec.cancellation ? spec.cancellation : &cancelled;
     const auto result = transfer::FileTransferEngine::receive_file_from_client(
         local_path.string(), context, options_);
     return result.success
@@ -94,7 +94,7 @@ common::Status DataChannelClient::receive_listing(
     }
     context.type = session::TransferType::binary;
     std::atomic_bool cancelled{false};
-    context.cancellation = &cancelled;
+    context.cancellation = spec.cancellation ? spec.cancellation : &cancelled;
     auto receiver = rdt::create_stop_and_wait_transport(options_);
     std::vector<std::byte> bytes;
     status = receiver->receive(context, bytes);

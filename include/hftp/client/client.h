@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,7 @@ private:
     network::Socket control_socket_;
     control::CrlfFramer reply_framer_;
     std::atomic_bool connected_{false};
+    std::mutex send_mutex_;
 };
 
 } // namespace hftp::client

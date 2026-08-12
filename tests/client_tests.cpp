@@ -99,4 +99,11 @@ int main() {
     assert(!closed);
     assert(closed.error == Error::socket_error);
     assert(!client.connected());
+
+    listener.close();
+    Client refused;
+    const auto refused_status = refused.connect("127.0.0.1", port);
+    assert(!refused_status);
+    assert(refused_status.error == Error::socket_error);
+    assert(refused_status.message.find("error 0") == std::string::npos);
 }

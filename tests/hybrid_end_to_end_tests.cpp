@@ -1,4 +1,5 @@
 #include "hftp/client/client.h"
+#include "hftp/client/cli.h"
 #include "hftp/client/data_channel.h"
 #include "hftp/control/authenticator.h"
 #include "hftp/control/command_dispatcher.h"
@@ -260,6 +261,8 @@ bool transfer_file(hftp::client::Client& control,
 
     std::string completion;
     TEST_CHECK(receive_code(control, 226, completion));
+    TEST_CHECK(hftp::client::verify_transfer_sha256(
+        status.message, std::vector<std::string>{completion}));
     return true;
 }
 

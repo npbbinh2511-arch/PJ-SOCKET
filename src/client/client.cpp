@@ -17,12 +17,20 @@
 namespace hftp::client {
 namespace {
 
-common::Status socket_failure(std::string message) {
+int current_socket_error() noexcept {
 #ifdef _WIN32
-    message += " (WinSock error " + std::to_string(WSAGetLastError()) + ')';
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
+
+common::Status socket_failure(std::string message, int error) {
+#ifdef _WIN32
+    message += " (WinSock error " + std::to_string(error) + ')';
 #else
     message += ": ";
-    message += std::strerror(errno);
+    message += std::strerror(error);
 #endif
     return {common::Error::socket_error, std::move(message)};
 }
@@ -63,13 +71,17 @@ common::Status Client::connect(std::string_view host, std::uint16_t port) {
     const int resolve_result =
         getaddrinfo(host_text.c_str(), port_text.c_str(), &hints, &addresses);
     if (resolve_result != 0) {
-        return {common::Error::socket_error, "Unable to resolve server address"};
+        return {common::Error::socket_error,
+                "Unable to resolve server address (resolver error " +
+                    std::to_string(resolve_result) + ')'};
     }
 
+    int last_error = 0;
     for (const addrinfo* address = addresses; address != nullptr; address = address->ai_next) {
         network::Socket candidate(
             ::socket(address->ai_family, address->ai_socktype, address->ai_protocol));
         if (!candidate.valid()) {
+            last_error = current_socket_error();
             continue;
         }
 
@@ -82,17 +94,22 @@ common::Status Client::connect(std::string_view host, std::uint16_t port) {
             control_socket_ = std::move(candidate);
             break;
         }
+        last_error = current_socket_error();
     }
 
     freeaddrinfo(addresses);
     if (!control_socket_.valid()) {
-        return socket_failure("Unable to connect to server");
+        return last_error == 0
+            ? common::Status{common::Error::socket_error,
+                             "Unable to connect to any resolved server address"}
+            : socket_failure("Unable to connect to server", last_error);
     }
     connected_.store(true);
     return {};
 }
 
 common::Status Client::send_command(std::string_view command) {
+    const std::scoped_lock send_lock(send_mutex_);
     if (!connected()) {
         return {common::Error::socket_error, "Control connection is not open"};
     }
@@ -114,9 +131,10 @@ common::Status Client::send_command(std::string_view command) {
             control_socket_.native_handle(), wire_command.data() + sent,
             chunk_size, send_flags());
         if (result <= 0) {
+            const int error = current_socket_error();
             connected_.store(false);
             ::shutdown(control_socket_.native_handle(), close_direction());
-            return socket_failure("Unable to send FTP command");
+            return socket_failure("Unable to send FTP command", error);
         }
         sent += static_cast<std::size_t>(result);
     }
@@ -138,8 +156,9 @@ common::Status Client::receive_reply(std::vector<std::string>& replies) {
             return {common::Error::socket_error, "Server closed the control connection"};
         }
         if (received < 0) {
+            const int error = current_socket_error();
             connected_.store(false);
-            return socket_failure("Unable to receive FTP reply");
+            return socket_failure("Unable to receive FTP reply", error);
         }
 
         auto framed = reply_framer_.push(
@@ -169,7 +188,8 @@ common::Status Client::local_ipv4(std::string& address) const {
 #endif
     if (::getsockname(control_socket_.native_handle(),
                       reinterpret_cast<sockaddr*>(&storage), &length) != 0) {
-        return socket_failure("Unable to read local control address");
+        return socket_failure(
+            "Unable to read local control address", current_socket_error());
     }
     if (storage.ss_family != AF_INET) {
         return {common::Error::invalid_argument,
@@ -178,7 +198,8 @@ common::Status Client::local_ipv4(std::string& address) const {
     const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(&storage);
     std::array<char, INET_ADDRSTRLEN> text{};
     if (::inet_ntop(AF_INET, &ipv4->sin_addr, text.data(), text.size()) == nullptr) {
-        return socket_failure("Unable to format local IPv4 address");
+        return socket_failure(
+            "Unable to format local IPv4 address", current_socket_error());
     }
     address = text.data();
     return {};
@@ -186,6 +207,7 @@ common::Status Client::local_ipv4(std::string& address) const {
 
 void Client::disconnect() noexcept {
     connected_.store(false);
+    const std::scoped_lock send_lock(send_mutex_);
     if (control_socket_.valid()) {
         ::shutdown(control_socket_.native_handle(), close_direction());
         control_socket_.close();

@@ -120,6 +120,12 @@ bool transfer_to_engine(const std::filesystem::path& source,
     TEST_CHECK(send_result.success);
     TEST_CHECK(receive_status);
     TEST_CHECK(receive_status.message.find("sha256=") != std::string::npos);
+    const auto sender_hash = send_result.message.find("sha256=");
+    const auto receiver_hash = receive_status.message.find("sha256=");
+    TEST_CHECK(sender_hash != std::string::npos);
+    TEST_CHECK(receiver_hash != std::string::npos);
+    TEST_CHECK(send_result.message.substr(sender_hash) ==
+               receive_status.message.substr(receiver_hash));
     return true;
 }
 

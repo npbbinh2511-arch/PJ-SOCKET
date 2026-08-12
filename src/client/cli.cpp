@@ -6,15 +6,18 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <charconv>
 #include <cctype>
+#include <condition_variable>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
-#include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,6 +30,108 @@
 #endif
 
 namespace hftp::client {
+
+common::Status tokenize_cli_line(
+    std::string_view line, std::vector<std::string>& tokens) {
+    tokens.clear();
+    std::string token;
+    bool quoted = false;
+    bool token_started = false;
+
+    for (const char character : line) {
+        if (character == '\r' || character == '\n') {
+            tokens.clear();
+            return {common::Error::invalid_argument,
+                    "CLI command must be a single line"};
+        }
+        if (character == '"') {
+            quoted = !quoted;
+            token_started = true;
+            continue;
+        }
+        if (!quoted && std::isspace(static_cast<unsigned char>(character))) {
+            if (token_started) {
+                tokens.push_back(std::move(token));
+                token.clear();
+                token_started = false;
+            }
+            continue;
+        }
+        token.push_back(character);
+        token_started = true;
+    }
+
+    if (quoted) {
+        tokens.clear();
+        return {common::Error::invalid_argument, "Unterminated quoted argument"};
+    }
+    if (token_started) {
+        tokens.push_back(std::move(token));
+    }
+    return {};
+}
+
+common::Status verify_transfer_sha256(
+    std::string_view local_completion,
+    const std::vector<std::string>& server_replies) {
+    const auto digest_from = [](std::string_view text)
+        -> std::optional<std::string> {
+        constexpr std::string_view marker = "sha256=";
+        const auto position = text.find(marker);
+        if (position == std::string_view::npos) {
+            return std::nullopt;
+        }
+        const auto begin = position + marker.size();
+        constexpr std::size_t digest_length = 64;
+        if (text.size() < begin + digest_length) {
+            return std::nullopt;
+        }
+        auto digest = std::string(text.substr(begin, digest_length));
+        if (!std::all_of(digest.begin(), digest.end(), [](unsigned char value) {
+                return std::isxdigit(value) != 0;
+            })) {
+            return std::nullopt;
+        }
+        if (text.size() > begin + digest_length &&
+            !std::isspace(static_cast<unsigned char>(
+                text[begin + digest_length]))) {
+            return std::nullopt;
+        }
+        std::transform(digest.begin(), digest.end(), digest.begin(),
+                       [](unsigned char value) {
+                           return static_cast<char>(std::tolower(value));
+                       });
+        return digest;
+    };
+
+    const auto local_digest = digest_from(local_completion);
+    if (!local_digest) {
+        return {common::Error::protocol_error,
+                "Local transfer result has no valid SHA-256 digest"};
+    }
+
+    std::optional<std::string> server_digest;
+    for (const auto& reply : server_replies) {
+        if (reply.size() >= 3 && reply.substr(0, 3) == "226") {
+            server_digest = digest_from(reply);
+            if (server_digest) {
+                break;
+            }
+        }
+    }
+    if (!server_digest) {
+        return {common::Error::protocol_error,
+                "Server completion reply has no valid SHA-256 digest"};
+    }
+    if (*local_digest != *server_digest) {
+        return {common::Error::integrity_error,
+                "SHA-256 mismatch local=" + *local_digest +
+                    " server=" + *server_digest};
+    }
+    return {common::Error::none,
+            "Integrity verified sha256=" + *local_digest};
+}
+
 namespace {
 
 struct CliState {
@@ -39,22 +144,65 @@ struct CliState {
     std::string active_address;
 };
 
+struct TransferControl {
+    void mark_started() {
+        const std::scoped_lock lock(state_mutex);
+        started = true;
+        state_changed.notify_all();
+    }
+
+    void mark_done() {
+        const std::scoped_lock lock(state_mutex);
+        done = true;
+        state_changed.notify_all();
+    }
+
+    void wait_until_started_or_done() {
+        std::unique_lock lock(state_mutex);
+        state_changed.wait(lock, [this] { return started || done; });
+    }
+
+    [[nodiscard]] bool is_done() const {
+        const std::scoped_lock lock(state_mutex);
+        return done;
+    }
+
+    common::Status request_abort(Client& client) {
+        cancellation.store(true, std::memory_order_release);
+        const std::scoped_lock lock(abort_mutex);
+        if (abort_attempted) {
+            return abort_status;
+        }
+        abort_attempted = true;
+        abort_status = client.send_command("ABOR");
+        abort_sent = static_cast<bool>(abort_status);
+        return abort_status;
+    }
+
+    [[nodiscard]] bool was_abort_sent() const {
+        const std::scoped_lock lock(abort_mutex);
+        return abort_sent;
+    }
+
+    std::atomic_bool cancellation{false};
+
+private:
+    mutable std::mutex state_mutex;
+    std::condition_variable state_changed;
+    bool started{false};
+    bool done{false};
+    mutable std::mutex abort_mutex;
+    bool abort_attempted{false};
+    bool abort_sent{false};
+    common::Status abort_status;
+};
+
 std::string uppercase(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(),
                    [](unsigned char character) {
                        return static_cast<char>(std::toupper(character));
                    });
     return value;
-}
-
-std::vector<std::string> tokenize(std::string_view line) {
-    std::istringstream input{std::string(line)};
-    std::vector<std::string> tokens;
-    std::string token;
-    while (input >> std::quoted(token)) {
-        tokens.push_back(std::move(token));
-    }
-    return tokens;
 }
 
 std::optional<int> reply_code(std::string_view reply) {
@@ -310,18 +458,44 @@ std::string wire_command(const TransferRequest& request) {
         ? request.verb : request.verb + ' ' + request.remote_argument;
 }
 
-bool terminal_reply(const std::vector<std::string>& replies) {
+bool transfer_terminal_reply(const std::vector<std::string>& replies) {
     return std::any_of(replies.begin(), replies.end(), [](const auto& reply) {
         const auto code = reply_code(reply);
-        return code && (*code == 226 || *code >= 400);
+        return code && (*code == 226 || *code == 425 || *code == 426 ||
+                        *code == 450 || *code == 550);
+    });
+}
+
+bool abort_command_reply(const std::vector<std::string>& replies) {
+    return std::any_of(replies.begin(), replies.end(), [](const auto& reply) {
+        const auto code = reply_code(reply);
+        return code && (*code == 200 || *code == 503);
     });
 }
 
 bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
-                  const TransferRequest& request) {
+                  const TransferRequest& request, TransferControl& control) {
     if (request.upload && !std::filesystem::is_regular_file(request.local_path)) {
         std::cerr << "Local file not found: " << request.local_path.string() << '\n';
         return false;
+    }
+    if (!request.upload && !request.listing) {
+        std::error_code error;
+        const auto parent = request.local_path.parent_path();
+        if ((!parent.empty() && !std::filesystem::is_directory(parent, error)) ||
+            error) {
+            std::cerr << "Local destination directory not found: "
+                      << (parent.empty() ? std::filesystem::current_path().string()
+                                         : parent.string())
+                      << '\n';
+            return false;
+        }
+        error.clear();
+        if (std::filesystem::is_directory(request.local_path, error)) {
+            std::cerr << "Local destination is a directory: "
+                      << request.local_path.string() << '\n';
+            return false;
+        }
     }
     if (!prepare_data_channel(client, state)) {
         return false;
@@ -339,6 +513,7 @@ bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
         return false;
     }
     print_replies(replies);
+    std::vector<std::string> transfer_replies = replies;
     const auto opening = std::find_if(replies.begin(), replies.end(),
         [](const auto& reply) { return reply_code(reply) == 150; });
     if (opening == replies.end()) {
@@ -351,6 +526,7 @@ bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
         state.prepared = session::DataMode::none;
         return false;
     }
+    control.mark_started();
 
     DataTransferSpec spec;
     spec.transfer_id = *transfer_id;
@@ -360,6 +536,7 @@ bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
     spec.active_local_endpoint = state.active_endpoint;
     spec.bound_socket = state.active_socket;
     spec.expected_size = marker_value(*opening, "bytes=").value_or(0);
+    spec.cancellation = &control.cancellation;
     unsigned int last_percentage = 101;
     spec.progress = [&last_percentage](std::uint64_t completed,
                                        std::uint64_t total) {
@@ -390,7 +567,10 @@ bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
     state.active_socket.reset();
     if (!status) {
         std::cerr << "Data transfer failed: " << status.message << '\n';
-        static_cast<void>(client.send_command("ABOR"));
+        const auto abort_status = control.request_abort(client);
+        if (!abort_status) {
+            std::cerr << "Unable to send ABOR: " << abort_status.message << '\n';
+        }
     } else {
         std::cout << "[data] " << status.message << '\n';
         if (request.listing) {
@@ -400,13 +580,28 @@ bool run_transfer(Client& client, DataChannelClient& data, CliState& state,
         }
     }
 
-    while (!terminal_reply(replies) && client.connected()) {
+    bool transfer_terminal = transfer_terminal_reply(replies);
+    bool abort_reply = !control.was_abort_sent() || abort_command_reply(replies);
+    while ((!transfer_terminal || !abort_reply) && client.connected()) {
         replies.clear();
         const auto receive_status = client.receive_reply(replies);
         if (!receive_status) {
             return false;
         }
         print_replies(replies);
+        transfer_replies.insert(
+            transfer_replies.end(), replies.begin(), replies.end());
+        transfer_terminal = transfer_terminal || transfer_terminal_reply(replies);
+        abort_reply = abort_reply || abort_command_reply(replies);
+    }
+    if (status && !request.listing) {
+        const auto integrity =
+            verify_transfer_sha256(status.message, transfer_replies);
+        if (!integrity) {
+            std::cerr << "[integrity] FAILED: " << integrity.message << '\n';
+            return false;
+        }
+        std::cout << "[integrity] " << integrity.message << '\n';
     }
     return static_cast<bool>(status);
 }
@@ -440,12 +635,22 @@ int run_cli(std::string_view host, std::uint16_t port) {
                      "APPE <local> [remote], STOU <local>, LIST/NLST [path].\n";
 
         std::string line;
+        std::optional<std::string> pending_line;
         while (client.connected()) {
             std::cout << "hybrid-ftp> " << std::flush;
-            if (!std::getline(std::cin, line)) {
+            if (pending_line) {
+                line = std::move(*pending_line);
+                pending_line.reset();
+                std::cout << line << '\n';
+            } else if (!std::getline(std::cin, line)) {
                 line = "QUIT";
             }
-            const auto tokens = tokenize(line);
+            std::vector<std::string> tokens;
+            const auto token_status = tokenize_cli_line(line, tokens);
+            if (!token_status) {
+                std::cerr << "Invalid CLI syntax: " << token_status.message << '\n';
+                continue;
+            }
             if (tokens.empty()) {
                 continue;
             }
@@ -473,7 +678,50 @@ int run_cli(std::string_view host, std::uint16_t port) {
                 continue;
             }
             if (const auto transfer = make_transfer_request(tokens)) {
-                static_cast<void>(run_transfer(client, data, state, *transfer));
+                TransferControl control;
+                bool transfer_result = false;
+                std::jthread transfer_worker([&] {
+                    transfer_result = run_transfer(
+                        client, data, state, *transfer, control);
+                    control.mark_done();
+                });
+                control.wait_until_started_or_done();
+                if (!control.is_done()) {
+                    std::cout << "[control] Transfer active. Type ABOR to cancel, "
+                                 "press Enter to wait, or enter the next command.\n"
+                                 "transfer> "
+                              << std::flush;
+                    std::string action;
+                    if (!std::getline(std::cin, action)) {
+                        pending_line = "QUIT";
+                        const auto abort_status = control.request_abort(client);
+                        if (!abort_status) {
+                            std::cerr << "Unable to send ABOR: "
+                                      << abort_status.message << '\n';
+                        }
+                    } else {
+                        std::vector<std::string> action_tokens;
+                        const auto action_status =
+                            tokenize_cli_line(action, action_tokens);
+                        if (!action_status) {
+                            std::cerr << "Invalid CLI syntax: "
+                                      << action_status.message << '\n';
+                        } else if (!action_tokens.empty() &&
+                                   uppercase(action_tokens.front()) == "ABOR") {
+                            const auto abort_status = control.request_abort(client);
+                            if (!abort_status) {
+                                std::cerr << "Unable to send ABOR: "
+                                          << abort_status.message << '\n';
+                            }
+                        } else if (!action_tokens.empty()) {
+                            pending_line = std::move(action);
+                        }
+                    }
+                }
+                if (transfer_worker.joinable()) {
+                    transfer_worker.join();
+                }
+                static_cast<void>(transfer_result);
                 continue;
             }
 

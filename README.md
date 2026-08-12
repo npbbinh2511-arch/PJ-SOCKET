@@ -20,7 +20,8 @@ Project không sử dụng FTP framework, RDT framework hoặc thư viện truy�
 - Custom RDT Go-Back-N: sequence number, ACK, CRC32, timeout, retransmission, duplicate suppression, cửa sổ trượt và FIN handshake.
 - HELLO/probe gắn với transfer ID để thiết lập đúng UDP peer trong cả bốn luồng Active/Passive upload/download.
 - Truyền ASCII theo NVT và truyền Binary không biến đổi dữ liệu.
-- SHA-256 thuần C++ và hash sau truyền.
+- SHA-256 thuần C++; client tự động đối chiếu hash đầu-cuối trong reply
+  `226` sau upload/download và báo mismatch là transfer lỗi.
 - Sandbox filesystem chống `..`, đường dẫn native tuyệt đối và symlink thoát khỏi FTP root.
 - Các lệnh: `USER`, `PASS`, `QUIT`, `NOOP`, `HELP`, `PWD`, `CWD`, `CDUP`, `MKD`, `RMD`, `LIST`, `NLST`, `STAT`, `SIZE`, `MDTM`, `TYPE`, `MODE`, `PORT`, `PASV`, `RETR`, `STOR`, `STOU`, `APPE`, `DELE`, `RNFR`, `RNTO`, `HASH`, `ABOR`.
 - CLI tự thương lượng data channel, hiển thị tiến trình, nhận listing và đọc/ghi file cục bộ.
@@ -120,11 +121,12 @@ Test bao phủ:
 - `LIST`, `NLST`, `STAT`, `STOU`, `APPE`, `HELP` và session isolation.
 - Logger chống log forging và progress tracker thread-safe.
 - Data channel kiểm tra đủ ma trận Active/Passive × upload/download.
-- End-to-end dùng server và client thật qua TCP control + UDP RDT, đối chiếu byte nhị phân hai chiều.
+- End-to-end dùng server và client thật qua TCP control + UDP RDT, đối chiếu
+  byte nhị phân và SHA-256 hai chiều.
 
 ## Giới hạn có chủ đích
 
-- CLI chạy một transfer ở foreground, vì vậy không nhập `ABOR` tương tác trong chính lúc tiến trình đang chạy. Server và protocol vẫn hỗ trợ `ABOR`, đã có test về cancellation và thứ tự reply.
+- Trong lúc transfer đang chạy, CLI chấp nhận `ABOR`; nhấn Enter để chờ hoặc nhập trước command kế tiếp. Client giữ command kế tiếp đến khi nhận đủ reply kết thúc transfer, nên control channel không bị lệch reply.
 - Dữ liệu của một transfer hiện được giữ trong bộ nhớ; phù hợp đồ án và file thử nghiệm, chưa tối ưu cho file rất lớn.
 - Giao thức dùng IPv4 và không mã hóa control/data channel. Chỉ nên chạy trong môi trường học tập hoặc mạng tin cậy.
 - `MODE S` và `STRU F` được hỗ trợ; các mode/structure FTP khác nằm ngoài phạm vi Hybrid FTP này.
